@@ -22,8 +22,6 @@ Monitor the global threat landscape from your own infrastructure — no API keys
 
 ![ThreatWatch Dashboard](docs/preview.gif)
 
-![Dashboard Screenshot](docs/screenshot.png)
-
 ---
 
 ## ✨ Features
