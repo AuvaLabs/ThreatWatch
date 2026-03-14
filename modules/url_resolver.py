@@ -1,5 +1,7 @@
 # ==== Module Imports ====
+import base64
 import logging
+import re
 import requests
 from urllib.parse import urlparse, parse_qs
 from bs4 import BeautifulSoup
@@ -31,6 +33,35 @@ def is_clearnet_url(url: str) -> bool:
         return bool(host)
     except Exception:
         return False
+
+
+# ==== Google News URL Decoding ====
+_GNEWS_URL_RE = re.compile(
+    rb'https?://[a-zA-Z0-9\-._~:/?#\[\]@!$&\'()*+,;=%]+'
+)
+
+def decode_google_news_url(url: str) -> str | None:
+    """Decode a Google News RSS article link to the actual article URL.
+
+    Google News RSS feeds wrap article links as base64-encoded protobuf:
+      https://news.google.com/rss/articles/<encoded>?hl=...
+    The encoded part contains the real URL embedded in protobuf bytes.
+    Decoding is done locally — no HTTP request, no CAPTCHA risk.
+    Returns the decoded URL, or None if the URL is not a Google News link
+    or decoding fails.
+    """
+    if 'news.google.com' not in url or '/articles/' not in url:
+        return None
+    try:
+        encoded = url.split('/articles/')[-1].split('?')[0]
+        pad = (4 - len(encoded) % 4) % 4
+        decoded = base64.urlsafe_b64decode(encoded + '=' * pad)
+        match = _GNEWS_URL_RE.search(decoded)
+        if match:
+            return match.group(0).decode('utf-8')
+    except Exception:
+        pass
+    return None
 
 
 # ==== Embedded URL Extraction ====
@@ -70,15 +101,21 @@ def resolve_original_url(url):
     if url in _CACHE:
         return _CACHE[url]
 
-    embedded = extract_embedded_url(url)
-    if embedded:
-        result = embedded
+    # Google News article links must be decoded locally — following them via HTTP
+    # triggers Google's bot-detection CAPTCHA page.
+    gnews_decoded = decode_google_news_url(url)
+    if gnews_decoded:
+        result = gnews_decoded
     else:
-        redirected = follow_redirects(url)
-        if redirected and redirected != url:
-            result = redirected
+        embedded = extract_embedded_url(url)
+        if embedded:
+            result = embedded
         else:
-            result = extract_canonical_from_html(url) or url
+            redirected = follow_redirects(url)
+            if redirected and redirected != url:
+                result = redirected
+            else:
+                result = extract_canonical_from_html(url) or url
 
     if len(_CACHE) >= _CACHE_MAX:
         _CACHE.pop(next(iter(_CACHE)))
