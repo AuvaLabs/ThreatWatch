@@ -1314,6 +1314,12 @@ body.self-hosted-mode .watch-section-desc .sh-only { display: inline; }
   color: var(--text-muted); letter-spacing: 1.5px; text-transform: uppercase;
 }
 .watch-tab-count { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+.watch-back-btn {
+  background: none; border: 1px solid var(--panel-border); border-radius: 4px;
+  padding: 3px 8px; font-family: var(--font-body); font-size: 11px; font-weight: 500;
+  color: var(--text-muted); cursor: pointer; transition: color 0.15s, border-color 0.15s; flex-shrink: 0;
+}
+.watch-back-btn:hover { color: var(--text-primary); border-color: var(--text-muted); }
 .watch-empty { padding: 48px 28px; text-align: center; color: var(--text-muted); font-size: 13px; line-height: 1.7; }
 .watch-empty strong { color: var(--text-secondary); display: block; margin-bottom: 8px; font-size: 14px; }
 .watch-article {
@@ -2035,6 +2041,7 @@ body.self-hosted-mode .watch-section-desc .sh-only { display: inline; }
   <!-- BRAND WATCH TAB -->
     <div id="tab-brands">
       <div class="watch-tab-header">
+        <button class="watch-back-btn" onclick="switchMainTab('briefing')" title="Back to main feed">&#8592; Feed</button>
         <span class="watch-tab-title">Brand Watch</span>
         <span class="watch-tab-count" id="brands-count"></span>
       </div>
@@ -2044,6 +2051,7 @@ body.self-hosted-mode .watch-section-desc .sh-only { display: inline; }
     <!-- ASSET WATCH TAB -->
     <div id="tab-assets">
       <div class="watch-tab-header">
+        <button class="watch-back-btn" onclick="switchMainTab('briefing')" title="Back to main feed">&#8592; Feed</button>
         <span class="watch-tab-title">Tech / Asset Watch</span>
         <span class="watch-tab-count" id="assets-count"></span>
       </div>
@@ -3305,9 +3313,10 @@ function renderFeedCards(reset = true) {
 }
 
 function loadMoreCards() {
-  renderFeedCards(false);
   const container = document.getElementById('threat-feed');
-  if (container) requestAnimationFrame(() => { container.scrollTop = 0; });
+  const savedScroll = container ? container.scrollTop : 0;
+  renderFeedCards(false);
+  if (container) requestAnimationFrame(() => { container.scrollTop = savedScroll; });
 }
 
 function updateLoadMoreSentinel(show) {
@@ -4393,16 +4402,17 @@ function _allVendorNames() {
 
 function _loadWatchState() {
   try {
-    const ev = localStorage.getItem('tw_enabled_vendors');
-    // First visit: enable all vendors by default
-    watchState.enabledVendors = ev
-      ? new Set(JSON.parse(ev))
-      : new Set(_allVendorNames());
-
-    const cb = localStorage.getItem('tw_custom_brands');
-    // First visit: show sample brands
-    watchState.customBrands = cb ? JSON.parse(cb) : [..._DEFAULT_BRANDS];
-
+    const initialized = localStorage.getItem('tw_watch_initialized');
+    if (!initialized) {
+      // Truly first visit: enable all vendors, pre-populate sample brands
+      watchState.enabledVendors = new Set(_allVendorNames());
+      watchState.customBrands = [..._DEFAULT_BRANDS];
+    } else {
+      const ev = localStorage.getItem('tw_enabled_vendors');
+      watchState.enabledVendors = ev ? new Set(JSON.parse(ev)) : new Set();
+      const cb = localStorage.getItem('tw_custom_brands');
+      watchState.customBrands = cb ? JSON.parse(cb) : [];
+    }
     const ca = localStorage.getItem('tw_custom_assets');
     if (ca) watchState.customAssets = JSON.parse(ca);
   } catch(e) {}
@@ -4410,6 +4420,7 @@ function _loadWatchState() {
 
 function _saveWatchState() {
   try {
+    localStorage.setItem('tw_watch_initialized', '1');
     localStorage.setItem('tw_enabled_vendors', JSON.stringify([...watchState.enabledVendors]));
     localStorage.setItem('tw_custom_brands', JSON.stringify(watchState.customBrands));
     localStorage.setItem('tw_custom_assets', JSON.stringify(watchState.customAssets));
