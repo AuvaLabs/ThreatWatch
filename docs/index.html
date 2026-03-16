@@ -1858,10 +1858,46 @@ body.self-hosted-mode .watch-section-desc .sh-only { display: inline; }
   .detail-body { font-size: 14px; }
   .filter-btn { padding: 7px 10px; }
 }
+
+/* ── Page loader ─────────────────────────────────────────────────────────── */
+#page-loader {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 20px;
+  transition: opacity 0.4s ease;
+}
+#page-loader.hide {
+  opacity: 0;
+  pointer-events: none;
+}
+.loader-logo {
+  font-size: 22px; font-weight: 800; letter-spacing: 3px;
+  color: var(--accent); font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+.loader-spinner {
+  width: 36px; height: 36px;
+  border: 3px solid var(--panel-border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loader-status {
+  font-size: 11px; color: var(--text-muted);
+  letter-spacing: 1px; text-transform: uppercase;
+}
 </style>
 <!-- __SSR_DATA__ -->
 </head>
 <body>
+
+<div id="page-loader">
+  <div class="loader-logo">THREATWATCH</div>
+  <div class="loader-spinner"></div>
+  <div class="loader-status">Loading intelligence feed…</div>
+</div>
 
 <div id="app">
   <!-- =========================================================== -->
@@ -3943,6 +3979,13 @@ function updateMarquee() {
 /* ============================================================= */
 /* DATA MANAGEMENT                                                */
 /* ============================================================= */
+function hideLoader() {
+  const loader = document.getElementById('page-loader');
+  if (!loader || loader.classList.contains('hide')) return;
+  loader.classList.add('hide');
+  setTimeout(() => loader.remove(), 450);
+}
+
 function applyData(items) {
   // Sort by date descending
   items.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
@@ -3973,6 +4016,7 @@ function applyData(items) {
     'Updated ' + new Date().toUTCString().slice(17, 25) + ' UTC';
   document.getElementById('badge-feeds').classList.toggle('visible', items.length === 0);
   updateLeftFooter(items);
+  hideLoader();
 }
 
 function updateLeftFooter(items) {
@@ -4341,6 +4385,15 @@ function init() {
 
   // Phase 3: Schedule periodic refresh (local API only — fast)
   setInterval(refreshData, REFRESH_INTERVAL);
+
+  // Safety: dismiss loader after 5s even if pipeline has no data yet
+  setTimeout(() => {
+    const loader = document.getElementById('page-loader');
+    if (!loader) return;
+    const status = loader.querySelector('.loader-status');
+    if (status) status.textContent = 'Pipeline warming up — check back shortly';
+    setTimeout(hideLoader, 1500);
+  }, 5000);
 }
 
 /* ============================================================= */
