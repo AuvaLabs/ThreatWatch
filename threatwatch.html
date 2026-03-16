@@ -26,10 +26,6 @@
   --warning: #b7791f;
   --success: #1e7e4e;
   --purple: #5b21b6;
-  --cyan: #1a56db;
-  --amber: #b7791f;
-  --red: #c0392b;
-  --green: #1e7e4e;
   --panel-bg: #ffffff;
   --panel-border: rgba(0,0,0,0.08);
   --panel-solid: #ffffff;
@@ -42,7 +38,6 @@
   --stat-bg: #f7f7f7;
   --stat-border: rgba(0,0,0,0.07);
   --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-serif: 'EB Garamond', Georgia, serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
   --font-title: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --scrollbar-track: rgba(0,0,0,0.06);
@@ -78,6 +73,22 @@ html, body {
   font-family: var(--font-body);
   font-size: 15px;
 }
+
+/* ============================================================= */
+/* FOCUS VISIBLE — keyboard accessibility                        */
+/* ============================================================= */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.filter-btn:focus-visible,
+.region-btn:focus-visible,
+.main-tab:focus-visible,
+.theme-toggle:focus-visible,
+.briefing-mode-toggle:focus-visible,
+.watch-btn:focus-visible { outline-offset: 1px; border-radius: 3px; }
+:focus:not(:focus-visible) { outline: none; }
 
 /* Custom scrollbar */
 ::-webkit-scrollbar { width: 4px; }
@@ -271,12 +282,11 @@ html, body {
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
-#threat-level.low { background: rgba(30,126,78,0.08); color: var(--green); border: 1px solid rgba(30,126,78,0.15); }
+#threat-level.low { background: rgba(30,126,78,0.08); color: var(--success); border: 1px solid rgba(30,126,78,0.15); }
 #threat-level.medium { background: rgba(183,121,31,0.08); color: var(--warning); border: 1px solid rgba(183,121,31,0.15); }
 #threat-level.high { background: rgba(192,57,43,0.08); color: var(--danger); border: 1px solid rgba(192,57,43,0.15); }
 #threat-level.critical { background: rgba(192,57,43,0.08); color: var(--danger); border: 1px solid rgba(192,57,43,0.2); }
 
-@keyframes pulse-glow { 0%, 100% {} 50% {} }
 
 /* ============================================================= */
 /* PANELS (shared)                                                */
@@ -303,10 +313,10 @@ html, body {
 
 .panel-title {
   font-family: var(--font-body);
-  font-weight: 600;
-  font-size: 11px;
-  color: var(--text-muted);
-  letter-spacing: 1.5px;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
   text-transform: uppercase;
   display: flex;
   align-items: center;
@@ -407,7 +417,7 @@ html, body {
   align-items: center;
   gap: 8px;
   margin-top: 6px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   font-family: var(--font-mono);
 }
@@ -444,7 +454,7 @@ html, body {
 #threat-feed {
   flex: 1;
   overflow-y: auto;
-  padding: 6px 4px;
+  padding: 6px 6px;
   -webkit-overflow-scrolling: touch;
   overflow-anchor: none;
 }
@@ -541,10 +551,14 @@ html, body {
   text-transform: uppercase;
 }
 
-/* Source badges — hidden in feed list, except dark web */
-.badge-src { display: none; }
-.badge-src.darkweb {
+/* Source badges — visible for all sources */
+.badge-src {
   display: inline-flex;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--panel-border);
+}
+.badge-src.darkweb {
   background: rgba(192,57,43,0.07);
   color: var(--danger);
   border: 1px solid rgba(192,57,43,0.18);
@@ -604,7 +618,7 @@ html, body {
 
 .card-time {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   white-space: nowrap;
 }
@@ -658,17 +672,17 @@ html, body {
 }
 
 .center-header {
-  padding: 14px 28px 12px;
-  border-bottom: 1px solid var(--panel-border);
+  padding: 14px 28px 0;
+  border-bottom: none;
   flex-shrink: 0;
 }
 
 .center-header .panel-title {
   font-family: var(--font-body);
-  font-weight: 600;
-  font-size: 11px;
-  color: var(--text-muted);
-  letter-spacing: 1.5px;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
   text-transform: uppercase;
 }
 
@@ -680,10 +694,10 @@ html, body {
 }
 
 .region-btn {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.5px;
-  padding: 3px 8px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 0;
+  padding: 4px 10px;
   border: 1px solid var(--panel-border);
   border-radius: 3px;
   background: transparent;
@@ -744,8 +758,6 @@ html, body {
 .stats-bar .stat-box.critical .count { color: var(--danger); }
 .stats-bar .stat-box.high .count { color: #d35400; }
 
-/* Legacy stat-grid */
-.stat-grid { display: none; }
 
 /* ============================================================= */
 /* CENTER PANEL — INTELLIGENCE SECTIONS                           */
@@ -757,10 +769,10 @@ html, body {
 
 .center-section-title {
   font-family: var(--font-body);
-  font-weight: 600;
-  font-size: 11px;
-  color: var(--text-muted);
-  letter-spacing: 1.5px;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
   text-transform: uppercase;
   margin-bottom: 16px;
   display: flex;
@@ -1086,10 +1098,10 @@ html, body {
 
 .section-title {
   font-family: var(--font-body);
-  font-weight: 600;
-  font-size: 11px;
-  color: var(--text-muted);
-  letter-spacing: 1.5px;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
   text-transform: uppercase;
   margin-bottom: 12px;
   display: flex;
@@ -1145,15 +1157,8 @@ html, body {
 .source-status .dot.online { background: var(--success); }
 .source-status .dot.offline { background: var(--danger); opacity:0.5; }
 
-/* ============================================================= */
-/* BOTTOM BAR — Hidden                                            */
-/* ============================================================= */
+/* Intentionally hidden — kept for JS compatibility */
 #bottombar { display: none; }
-#marquee-track { display:flex; white-space:nowrap; }
-#marquee-track span { padding:0 20px; }
-@keyframes marquee-scroll { from { transform:translateX(0); } to { transform:translateX(-50%); } }
-
-/* RIGHT PANEL — hidden */
 #right-panel { display: none !important; }
 
 /* ============================================================= */
@@ -1161,24 +1166,29 @@ html, body {
 /* ============================================================= */
 .main-tabs {
   display: flex;
-  gap: 4px;
-  margin-bottom: 10px;
+  gap: 0;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--panel-border);
+  padding: 0 4px;
 }
 .main-tab {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.5px;
-  padding: 4px 14px;
-  border: 1px solid var(--panel-border);
-  border-radius: 3px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  padding: 10px 14px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: color 0.15s, border-color 0.15s;
   white-space: nowrap;
+  margin-bottom: -1px;
 }
-.main-tab:hover { background: var(--surface); color: var(--text-primary); }
-.main-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.main-tab:hover { color: var(--text-primary); background: transparent; }
+.main-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; background: transparent; }
 
 /* ============================================================= */
 /* RANSOMWARE TRACKER                                             */
@@ -1308,8 +1318,8 @@ body.self-hosted-mode .watch-section-desc .sh-only { display: inline; }
   display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
 }
 .watch-tab-title {
-  font-family: var(--font-body); font-weight: 600; font-size: 11px;
-  color: var(--text-muted); letter-spacing: 1.5px; text-transform: uppercase;
+  font-family: var(--font-body); font-weight: 700; font-size: 12px;
+  color: var(--text-secondary); letter-spacing: 1px; text-transform: uppercase;
 }
 .watch-tab-count { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
 .watch-empty { padding: 48px 28px; text-align: center; color: var(--text-muted); font-size: 13px; line-height: 1.7; }
@@ -2034,7 +2044,7 @@ body.self-hosted-mode .watch-section-desc .sh-only { display: inline; }
     <div id="tab-ransom">
       <div class="ransom-tracker-stats" id="ransom-tracker-stats">
         <div><div class="ransom-stat-header-val" id="ransom-stat-groups" style="color:var(--danger)">—</div><div class="ransom-stat-header-label">Active Groups</div></div>
-        <div><div class="ransom-stat-header-val" id="ransom-stat-victims" style="color:var(--amber)">—</div><div class="ransom-stat-header-label">Victims Posted</div></div>
+        <div><div class="ransom-stat-header-val" id="ransom-stat-victims" style="color:var(--warning)">—</div><div class="ransom-stat-header-label">Victims Posted</div></div>
         <div><div class="ransom-stat-header-val" id="ransom-stat-news">—</div><div class="ransom-stat-header-label">News Articles</div></div>
         <span class="ransom-source-badge">ransomware.live</span>
       </div>
@@ -2946,15 +2956,15 @@ function renderActorSpotlight(items, allText) {
   let html = '';
   if (activeName) {
     html += `<div style="margin-bottom:6px;display:flex;align-items:center;gap:6px">
-      <span style="font-size:10px;color:var(--cyan);font-family:var(--font-mono)">Filtered: ${escapeHTML(activeName)}</span>
+      <span style="font-size:10px;color:var(--accent);font-family:var(--font-mono)">Filtered: ${escapeHTML(activeName)}</span>
       <button onclick="clearActorFilter()" style="background:none;border:1px solid var(--stat-border);color:var(--text-muted);font-size:9px;padding:2px 8px;border-radius:3px;cursor:pointer;font-family:var(--font-mono)">CLEAR</button>
     </div>`;
   }
 
   html += `<div class="actor-grid">${found.slice(0, 8).map(actor => {
     const isActive = activeName === actor.name;
-    const typeColor = actor.type === 'Nation-State' ? 'var(--red)' :
-                      actor.type === 'Ransomware' ? 'var(--amber)' :
+    const typeColor = actor.type === 'Nation-State' ? 'var(--danger)' :
+                      actor.type === 'Ransomware' ? 'var(--warning)' :
                       actor.type === 'Malware' || actor.type === 'Stealer' || actor.type === 'Loader' ? '#ff8c00' :
                       actor.type === 'Botnet' ? 'var(--purple)' : 'var(--text-muted)';
     return `<div class="actor-tag${isActive ? ' active' : ''}" onclick="toggleActorFilter(${actor.idx})">
@@ -3014,7 +3024,7 @@ function renderSectorImpact(items, allText) {
   let html = '';
   if (activeName) {
     html += `<div style="margin-bottom:6px;display:flex;align-items:center;gap:6px">
-      <span style="font-size:10px;color:var(--amber);font-family:var(--font-mono)">Filtered: ${escapeHTML(activeName)}</span>
+      <span style="font-size:10px;color:var(--warning);font-family:var(--font-mono)">Filtered: ${escapeHTML(activeName)}</span>
       <button onclick="clearSectorFilter()" style="background:none;border:1px solid var(--stat-border);color:var(--text-muted);font-size:9px;padding:2px 8px;border-radius:3px;cursor:pointer;font-family:var(--font-mono)">CLEAR</button>
     </div>`;
   }
@@ -3246,11 +3256,11 @@ function buildCardHTML(item) {
     countryHTML = `<span class="card-country">${flag} ${escapeHTML(name)}${countries.length > 1 ? ' +' + (countries.length - 1) + ' more' : ''}</span>`;
   }
 
-  const sevDotColor = item.severity === 'CRITICAL' ? 'var(--red)' :
+  const sevDotColor = item.severity === 'CRITICAL' ? 'var(--danger)' :
                       item.severity === 'HIGH' ? '#ff8c00' :
-                      item.severity === 'MEDIUM' ? 'var(--amber)' : '#556';
+                      item.severity === 'MEDIUM' ? 'var(--warning)' : '#556';
 
-  const confBadge = item.confidence ? `<span class="badge" style="background:rgba(30,126,78,0.07);color:var(--green);border:1px solid rgba(30,126,78,0.15);font-size:8px">${item.confidence}%</span>` : '';
+  const confBadge = item.confidence ? `<span class="badge" style="background:rgba(30,126,78,0.07);color:var(--success);border:1px solid rgba(30,126,78,0.15);font-size:8px">${item.confidence}%</span>` : '';
   const watchBadges = buildWatchBadges(item);
 
   return `<div class="feed-card ${sevClass}${activeClass}" data-id="${item._id}">
@@ -3547,9 +3557,9 @@ function selectItem(item) {
       <span class="badge badge-src ${item.sourceClass}">${item.source}</span>
       <span class="type-badge ${item.cssType}">${item.icon || ''} ${item.type}</span>
       <span class="badge" style="background:rgba(255,255,255,0.05);color:${
-        item.severity === 'CRITICAL' ? 'var(--red)' :
+        item.severity === 'CRITICAL' ? 'var(--danger)' :
         item.severity === 'HIGH' ? '#ff8c00' :
-        item.severity === 'MEDIUM' ? 'var(--amber)' : '#778'
+        item.severity === 'MEDIUM' ? 'var(--warning)' : '#778'
       }">${item.severity}</span>
     </div>
     <div class="detail-headline">${escapeHTML(item.title)}</div>
@@ -3557,8 +3567,8 @@ function selectItem(item) {
       <div><strong>Source:</strong> ${escapeHTML(item.source)}</div>
       <div><strong>Published:</strong> ${new Date(item.pubDate).toUTCString()}</div>
       <div><strong>Classification:</strong> ${item.type} / ${item.severity}</div>
-      ${item.confidence ? `<div><strong>Confidence:</strong> <span style="color:var(--green)">${item.confidence}%</span></div>` : ''}
-      ${item.aiCategory ? `<div><strong>Category:</strong> <span style="color:var(--cyan)">${escapeHTML(item.aiCategory)}</span></div>` : ''}
+      ${item.confidence ? `<div><strong>Confidence:</strong> <span style="color:var(--success)">${item.confidence}%</span></div>` : ''}
+      ${item.aiCategory ? `<div><strong>Category:</strong> <span style="color:var(--accent)">${escapeHTML(item.aiCategory)}</span></div>` : ''}
       ${item.isDarkweb && item.darkwebGroup ? `<div><strong>Threat Group:</strong> <span style="color:var(--danger);font-weight:700">${escapeHTML(item.darkwebGroup)}</span></div>` : ''}
       ${item.isDarkweb ? `<div><strong>Intel Source:</strong> <span style="color:var(--danger)">${escapeHTML(item.darkwebSource || 'Dark Web Monitor')}</span></div>` : ''}
     </div>
@@ -3662,14 +3672,14 @@ function updateOverviewStats() {
   if (latest.feeds_loaded) {
     pipelineHTML = `
       <div style="margin-bottom:10px;padding:8px;background:rgba(0,229,255,0.03);border:1px solid rgba(0,229,255,0.08);border-radius:4px;font-size:10px;">
-        <div style="font-family:var(--font-title);font-size:11px;color:var(--cyan);letter-spacing:1px;margin-bottom:6px">BACKEND PIPELINE</div>
+        <div style="font-family:var(--font-title);font-size:11px;color:var(--accent);letter-spacing:1px;margin-bottom:6px">BACKEND PIPELINE</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
-          <span style="color:#556">Feeds loaded:</span><span style="color:var(--cyan);text-align:right">${latest.feeds_loaded}</span>
-          <span style="color:#556">Articles fetched:</span><span style="color:var(--cyan);text-align:right">${latest.articles_fetched || 'N/A'}</span>
-          <span style="color:#556">After dedup:</span><span style="color:var(--cyan);text-align:right">${latest.articles_after_dedup || 'N/A'}</span>
-          <span style="color:#556">Cyber articles:</span><span style="color:var(--green);text-align:right">${latest.cyber_articles || 'N/A'}</span>
-          <span style="color:#556">Scrape success:</span><span style="color:var(--amber);text-align:right">${latest.scrape_successes || 0}/${(latest.scrape_successes || 0) + (latest.scrape_failures || 0)}</span>
-          <span style="color:#556">Total runs:</span><span style="color:var(--cyan);text-align:right">${(stats.runs || []).length}</span>
+          <span style="color:#556">Feeds loaded:</span><span style="color:var(--accent);text-align:right">${latest.feeds_loaded}</span>
+          <span style="color:#556">Articles fetched:</span><span style="color:var(--accent);text-align:right">${latest.articles_fetched || 'N/A'}</span>
+          <span style="color:#556">After dedup:</span><span style="color:var(--accent);text-align:right">${latest.articles_after_dedup || 'N/A'}</span>
+          <span style="color:#556">Cyber articles:</span><span style="color:var(--success);text-align:right">${latest.cyber_articles || 'N/A'}</span>
+          <span style="color:#556">Scrape success:</span><span style="color:var(--warning);text-align:right">${latest.scrape_successes || 0}/${(latest.scrape_successes || 0) + (latest.scrape_failures || 0)}</span>
+          <span style="color:#556">Total runs:</span><span style="color:var(--accent);text-align:right">${(stats.runs || []).length}</span>
         </div>
       </div>`;
   }
@@ -3678,7 +3688,7 @@ function updateOverviewStats() {
   statusContainer.innerHTML = pipelineHTML + `
     <div class="source-status">
       <span><span class="dot ${tdOnline ? 'online' : 'offline'}"></span>ThreatDigest Pipeline</span>
-      <span style="color:${tdOnline ? 'var(--green)' : '#555'}">${tdOnline ? 'ONLINE' : 'OFFLINE'}</span>
+      <span style="color:${tdOnline ? 'var(--success)' : '#555'}">${tdOnline ? 'ONLINE' : 'OFFLINE'}</span>
     </div>
     <div style="font-size:9px;color:var(--text-muted);padding:4px 0 0 16px">
       ${feedsLoaded} RSS/news sources aggregated server-side
@@ -4672,7 +4682,7 @@ function showWatchDetail(item, backTab) {
       <div class="detail-badges">
         <span class="badge badge-src ${item.sourceClass}">${escapeHTML(item.source)}</span>
         <span class="type-badge ${item.cssType}">${item.icon || ''} ${escapeHTML(item.type)}</span>
-        <span class="badge" style="color:${item.severity==='CRITICAL'?'var(--red)':item.severity==='HIGH'?'#ff8c00':'var(--amber)'}">${escapeHTML(item.severity)}</span>
+        <span class="badge" style="color:${item.severity==='CRITICAL'?'var(--danger)':item.severity==='HIGH'?'#ff8c00':'var(--warning)'}">${escapeHTML(item.severity)}</span>
       </div>
       <div class="detail-headline">${escapeHTML(item.title)}</div>
       <div class="detail-meta">
