@@ -97,7 +97,7 @@ def deploy():
             return
 
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-        msg = f"data: update threat intel feed — {now}"
+        msg = f"data: update threat intel feed - {now}"
         subprocess.run(
             ["git", "commit", "-m", msg, "--", "docs/"],
             cwd=BASE_DIR,
