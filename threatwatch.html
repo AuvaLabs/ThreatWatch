@@ -1948,16 +1948,6 @@ body.self-hosted-mode .watch-section-desc .sh-only { display: inline; }
       <button class="watch-close-btn" onclick="closeWatchDrawer()">&#x2715;</button>
     </div>
     <div class="watch-drawer-body">
-      <!-- Asset / Technology Watch -->
-      <div class="watch-section">
-        <div class="watch-section-head">&#x1F4BB; Asset / Technology Watch</div>
-        <div class="watch-section-desc">
-          Select vendors and technologies to highlight matching articles in the feed and TECH tab.
-          <span class="sh-only">Custom keywords below also run targeted Google News searches each pipeline cycle.</span>
-        </div>
-        <input type="text" class="vendor-search" id="vendor-search" placeholder="Search 150+ vendors..." oninput="filterVendorChips(this.value)">
-        <div id="vendor-grid"></div>
-      </div>
       <!-- Brand Watch -->
       <div class="watch-section">
         <div class="watch-section-head">&#x1F3F7;&#xFE0F; Brand Watch</div>
@@ -1970,6 +1960,16 @@ body.self-hosted-mode .watch-section-desc .sh-only { display: inline; }
           <input type="text" id="brand-tag-input" class="tag-text-input" placeholder="Type brand name, press Enter..." onkeydown="handleTagInput(event,'brands')">
         </div>
         <div class="tag-hint">Press Enter or , to add &middot; Click &times; to remove</div>
+      </div>
+      <!-- Asset / Technology Watch -->
+      <div class="watch-section">
+        <div class="watch-section-head">&#x1F4BB; Asset / Technology Watch</div>
+        <div class="watch-section-desc">
+          Select vendors and technologies to highlight matching articles in the feed and TECH tab.
+          <span class="sh-only">Custom keywords below also run targeted Google News searches each pipeline cycle.</span>
+        </div>
+        <input type="text" class="vendor-search" id="vendor-search" placeholder="Search 150+ vendors..." oninput="filterVendorChips(this.value)">
+        <div id="vendor-grid"></div>
       </div>
       <!-- Custom Asset Keywords (self-hosted only) -->
       <div class="watch-section" id="custom-asset-section" style="display:none">

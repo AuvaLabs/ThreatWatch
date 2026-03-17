@@ -1,0 +1,198 @@
+"""Tests for region accuracy fixes:
+- ISO-2 country code mapping in darkweb_monitor._country_to_region
+- Multi-region collapsing in deduplicator._collapse_regions
+- Content-based region inference in region_inferrer
+"""
+import pytest
+
+from modules.darkweb_monitor import _country_to_region
+from modules.deduplicator import _collapse_regions
+from modules.region_inferrer import infer_article_region, infer_articles_regions
+
+
+# ---------------------------------------------------------------------------
+# _country_to_region — ISO-2 codes
+# ---------------------------------------------------------------------------
+class TestCountryToRegion:
+    def test_iso2_us(self):
+        assert _country_to_region("US") == "US"
+
+    def test_iso2_germany(self):
+        assert _country_to_region("DE") == "Europe"
+
+    def test_iso2_france(self):
+        assert _country_to_region("FR") == "Europe"
+
+    def test_iso2_uk(self):
+        assert _country_to_region("GB") == "Europe"
+
+    def test_iso2_australia(self):
+        assert _country_to_region("AU") == "APAC"
+
+    def test_iso2_japan(self):
+        assert _country_to_region("JP") == "APAC"
+
+    def test_iso2_india(self):
+        assert _country_to_region("IN") == "APAC"
+
+    def test_iso2_singapore(self):
+        assert _country_to_region("SG") == "APAC"
+
+    def test_iso2_brazil(self):
+        assert _country_to_region("BR") == "LATAM"
+
+    def test_iso2_mexico(self):
+        assert _country_to_region("MX") == "LATAM"
+
+    def test_iso2_uae(self):
+        assert _country_to_region("AE") == "Middle East"
+
+    def test_iso2_israel(self):
+        assert _country_to_region("IL") == "Middle East"
+
+    def test_iso2_ukraine(self):
+        assert _country_to_region("UA") == "Europe"
+
+    def test_iso2_italy(self):
+        assert _country_to_region("IT") == "Europe"
+
+    def test_iso2_spain(self):
+        assert _country_to_region("ES") == "Europe"
+
+    def test_iso2_poland(self):
+        assert _country_to_region("PL") == "Europe"
+
+    def test_iso2_south_korea(self):
+        assert _country_to_region("KR") == "APAC"
+
+    def test_iso2_canada(self):
+        assert _country_to_region("CA") == "US"
+
+    def test_full_name_germany(self):
+        assert _country_to_region("Germany") == "Europe"
+
+    def test_full_name_united_states(self):
+        assert _country_to_region("United States") == "US"
+
+    def test_empty_returns_global(self):
+        assert _country_to_region("") == "Global"
+        assert _country_to_region(None) == "Global"
+
+    def test_unknown_returns_global(self):
+        assert _country_to_region("XZ") == "Global"
+        assert _country_to_region("Andorra") == "Global"
+
+    def test_case_insensitive_iso2(self):
+        assert _country_to_region("de") == "Europe"
+        assert _country_to_region("De") == "Europe"
+
+
+# ---------------------------------------------------------------------------
+# _collapse_regions — multi-region collapsing
+# ---------------------------------------------------------------------------
+class TestCollapseRegions:
+    def test_single_region_kept(self):
+        assert _collapse_regions({"US"}) == "US"
+
+    def test_two_regions_kept(self):
+        result = _collapse_regions({"US", "Europe"})
+        assert "US" in result and "Europe" in result
+
+    def test_three_regions_kept(self):
+        result = _collapse_regions({"US", "Europe", "APAC"})
+        assert len(result.split(",")) == 3
+
+    def test_four_regions_collapse_to_global(self):
+        assert _collapse_regions({"US", "Europe", "APAC", "LATAM"}) == "Global"
+
+    def test_five_regions_collapse_to_global(self):
+        assert _collapse_regions({"US", "UK", "France", "Germany", "Canada"}) == "Global"
+
+    def test_global_discarded_in_merge(self):
+        result = _collapse_regions({"US", "Global"})
+        assert result == "US"
+
+    def test_only_global_returns_global(self):
+        assert _collapse_regions({"Global"}) == "Global"
+
+    def test_empty_returns_global(self):
+        assert _collapse_regions(set()) == "Global"
+
+
+# ---------------------------------------------------------------------------
+# infer_article_region — content-based inference
+# ---------------------------------------------------------------------------
+class TestInferArticleRegion:
+    def _article(self, title, summary="", region="US", source="google"):
+        return {
+            "title": title,
+            "summary": summary,
+            "feed_region": region,
+            "source": source,
+        }
+
+    def test_german_company_in_title_corrects_us_region(self):
+        a = self._article("Akira ransomware hits Porsche Zentrum Fulda in Germany")
+        result = infer_article_region(a)
+        assert result["feed_region"] == "Europe"
+
+    def test_uk_attack_corrects_us_region(self):
+        a = self._article("British Hospital suffers major data breach")
+        result = infer_article_region(a)
+        assert result["feed_region"] == "Europe"
+
+    def test_japan_title_corrects_us_region(self):
+        a = self._article("Japanese automaker hit by supply chain attack")
+        result = infer_article_region(a)
+        assert result["feed_region"] == "APAC"
+
+    def test_australia_title_corrects_region(self):
+        a = self._article("Australian government agency breached by APT group")
+        result = infer_article_region(a)
+        assert result["feed_region"] == "APAC"
+
+    def test_brazil_title_corrects_region(self):
+        a = self._article("Brazilian bank hit by DDoS attack")
+        result = infer_article_region(a)
+        assert result["feed_region"] == "LATAM"
+
+    def test_us_article_keeps_us_region(self):
+        a = self._article("US Treasury Department warns of cyber threats", region="US")
+        result = infer_article_region(a)
+        assert result["feed_region"] == "US"
+
+    def test_global_article_inferred_from_title(self):
+        a = self._article("Sandworm targets Ukrainian infrastructure", region="Global")
+        result = infer_article_region(a)
+        assert result["feed_region"] == "Europe"
+
+    def test_global_article_no_match_stays_global(self):
+        a = self._article("New ransomware variant detected in the wild", region="Global")
+        result = infer_article_region(a)
+        assert result["feed_region"] == "Global"
+
+    def test_darkweb_articles_not_overridden(self):
+        a = {
+            "title": "akira ransomware: new victim 'Porsche Zentrum Fulda' (DE)",
+            "summary": "",
+            "feed_region": "Europe",
+            "source": "darkweb:ransomware.live",
+            "darkweb": True,
+        }
+        result = infer_article_region(a)
+        assert result["feed_region"] == "Europe"
+
+    def test_middle_east_inferred(self):
+        a = self._article("Iranian hackers breach Israeli defence contractor", region="US")
+        result = infer_article_region(a)
+        # Iran and Israel both map to Middle East
+        assert result["feed_region"] == "Middle East"
+
+    def test_batch_inference(self):
+        articles = [
+            self._article("German hospital pays ransom after cyberattack"),
+            self._article("New vulnerability in Apache server", region="Global"),
+        ]
+        results = infer_articles_regions(articles)
+        assert results[0]["feed_region"] == "Europe"
+        assert results[1]["feed_region"] == "Global"
