@@ -518,6 +518,16 @@ html, body {
 }
 .left-footer-links a:hover { color: var(--text-primary); }
 .lf-version { color: var(--text-muted); font-family: var(--font-mono); letter-spacing: 0.3px; }
+.left-footer-urls {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 6px 12px 4px;
+  border-top: 1px solid var(--panel-border);
+}
+.left-footer-urls a {
+  font-size: 9px; color: var(--text-muted); text-decoration: none;
+  font-family: var(--font-mono); letter-spacing: 0.3px;
+}
+.left-footer-urls a:hover { color: var(--accent); }
 
 /* ============================================================= */
 /* FEED CARD DESIGN — Intelligence cards                          */
@@ -1192,7 +1202,12 @@ html, body {
   margin-bottom: 0;
   border-bottom: 1px solid var(--panel-border);
   padding: 0 4px;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+.main-tabs::-webkit-scrollbar { display: none; }
 .main-tab {
   font-family: var(--font-body);
   font-size: 12px;
@@ -1209,6 +1224,7 @@ html, body {
   white-space: nowrap;
   margin-bottom: -1px;
 }
+.main-tab { flex-shrink: 0; }
 .main-tab:hover { color: var(--text-primary); background: transparent; }
 .main-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; background: transparent; }
 
@@ -1984,22 +2000,11 @@ body.self-hosted-mode .watch-section-desc .sh-only { display: inline; }
         </div>
         <span id="badge-feeds" class="cached-badge">FEEDS OFFLINE</span>
       </div>
-      <div class="feed-filters" id="feed-filters">
-        <button class="filter-btn active" data-filter="all">ALL</button>
-        <button class="filter-btn" data-filter="breach">BREACH</button>
-        <button class="filter-btn" data-filter="ransomware">RANSOMWARE</button>
-        <button class="filter-btn" data-filter="ddos">DDOS</button>
-        <button class="filter-btn" data-filter="apt">APT</button>
-        <button class="filter-btn" data-filter="phishing">PHISHING</button>
-        <button class="filter-btn" data-filter="malware">MALWARE</button>
-        <button class="filter-btn" data-filter="zero-day">ZERO-DAY</button>
-        <button class="filter-btn" data-filter="vuln">VULN</button>
-        <button class="filter-btn" data-filter="darkweb">DARK WEB</button>
-      </div>
       <div class="feed-search-wrap">
         <input type="text" id="feed-search" class="feed-search-input" placeholder="Search feed…"
           oninput="filterFeedSearch(this.value)" autocomplete="off" spellcheck="false">
       </div>
+      <div id="watch-filter-banner" style="display:none;align-items:center;justify-content:space-between;padding:4px 10px;background:rgba(45,140,255,0.1);border-bottom:1px solid rgba(45,140,255,0.2);font-size:10px;font-weight:700;letter-spacing:0.8px;color:var(--accent);"></div>
       <div class="feed-meta">
         <span id="last-refresh">--</span>
       </div>
@@ -2021,8 +2026,12 @@ body.self-hosted-mode .watch-section-desc .sh-only { display: inline; }
       </div>
       <div class="left-footer-links">
         <a href="https://auvalabs.github.io/threatwatch/feed.xml" target="_blank" rel="noopener" title="RSS Feed">RSS</a>
-        <a href="https://github.com/AuvaLabs/threatwatch" target="_blank" rel="noopener" title="GitHub">GitHub</a>
+        <a href="https://github.com/AuvaLabs/ThreatWatch" target="_blank" rel="noopener" title="GitHub">GitHub</a>
         <span class="lf-version">v1.0</span>
+      </div>
+      <div class="left-footer-urls">
+        <a href="https://threatwatch.auvalabs.com/" target="_blank" rel="noopener">threatwatch.auvalabs.com</a>
+        <a href="https://auvalabs.github.io/threatwatch/" target="_blank" rel="noopener">auvalabs.github.io/threatwatch</a>
       </div>
     </div>
   </div>
@@ -2035,8 +2044,15 @@ body.self-hosted-mode .watch-section-desc .sh-only { display: inline; }
     <div class="center-header" id="center-panel">
       <div class="main-tabs">
         <button class="main-tab active" data-tab="briefing" onclick="switchMainTab('briefing')">BRIEFING</button>
+        <button class="main-tab" data-tab="breach" onclick="switchMainTab('breach')">BREACH</button>
         <button class="main-tab" data-tab="ransom" onclick="switchMainTab('ransom')">RANSOMWARE</button>
+        <button class="main-tab" data-tab="ddos" onclick="switchMainTab('ddos')">DDOS</button>
         <button class="main-tab" data-tab="apt" onclick="switchMainTab('apt')">APT TRACKER</button>
+        <button class="main-tab" data-tab="phishing" onclick="switchMainTab('phishing')">PHISHING</button>
+        <button class="main-tab" data-tab="malware" onclick="switchMainTab('malware')">MALWARE</button>
+        <button class="main-tab" data-tab="zero-day" onclick="switchMainTab('zero-day')">ZERO-DAY</button>
+        <button class="main-tab" data-tab="vuln" onclick="switchMainTab('vuln')">VULN</button>
+        <button class="main-tab" data-tab="darkweb" onclick="switchMainTab('darkweb')">DARK WEB</button>
         <button class="main-tab" data-tab="brands" onclick="switchMainTab('brands')">BRANDS</button>
         <button class="main-tab" data-tab="assets" onclick="switchMainTab('assets')">TECH</button>
       </div>
@@ -2413,6 +2429,7 @@ const state = {
   prevTitles: new Set(),
   feedSearch: '',
   activeFilter: 'all',
+  watchFilter: null,
   activeRegion: 'all',
   activeSector: null,   // {name, re} or null
   activeActor: null,    // {name, re} or null
@@ -3349,7 +3366,16 @@ function buildCardHTML(item) {
 function renderFeedCards(reset = true) {
   const container = document.getElementById('threat-feed');
   const filter = state.activeFilter;
-  const filtered = state.newsItems.filter(item => filterMatchesItem(filter, item));
+  let filtered = state.newsItems.filter(item => filterMatchesItem(filter, item));
+  if (state.watchFilter) {
+    const { type, name } = state.watchFilter;
+    const re = _brandRegex(name);
+    filtered = filtered.filter(i =>
+      type === 'vendor'
+        ? ((i.assetTags || []).includes(name) || re.test((i.title || '') + ' ' + (i.description || '')))
+        : re.test((i.title || '') + ' ' + (i.description || ''))
+    );
+  }
 
   // Update header count
   const countBadge = document.getElementById('feed-count-badge');
@@ -3660,19 +3686,7 @@ function closeDetail() {
 /* ============================================================= */
 /* FILTER BUTTONS                                                 */
 /* ============================================================= */
-document.getElementById('feed-filters').addEventListener('click', (e) => {
-  if (!e.target.classList.contains('filter-btn')) return;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  e.target.classList.add('active');
-  state.activeFilter = e.target.dataset.filter;
-  state.activeSector = null; // clear all drilldowns on category change
-  state.activeActor = null;
-  state.activeCategory = null;
-  state._actionDrilldown = null;
-  renderFeedCards();
-  buildThreatCategoryChart([], state.newsItems);
-  debouncedAnalyze(); // refresh drilldown active states
-});
+/* feed-filters removed — category filtering now via center tabs (switchMainTab) */
 
 /* Region filter — controls center panel analysis */
 document.getElementById('region-filters').addEventListener('click', (e) => {
@@ -3880,9 +3894,7 @@ function drilldownAction(type, value) {
   state.activeActor = null;
   state.activeCategory = null;
   state.activeFilter = 'all';
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  const allBtn = document.querySelector('[data-filter="all"]');
-  if (allBtn) allBtn.classList.add('active');
+  document.querySelectorAll('.main-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === 'briefing'));
 
   if (type === 'severity') {
     // Filter by severity — use a special regex that matches severity-appropriate items
@@ -4057,6 +4069,9 @@ async function refreshData() {
 function switchMainTab(tab) {
   document.querySelectorAll('.main-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
 
+  const CATEGORY_TABS = ['breach', 'ddos', 'phishing', 'malware', 'zero-day', 'vuln', 'darkweb'];
+  const isCategory = CATEGORY_TABS.includes(tab);
+
   const briefingEl = document.querySelector('.center-content');
   const statsBar   = document.querySelector('.stats-bar');
   const regionBar  = document.getElementById('region-filters');
@@ -4065,26 +4080,54 @@ function switchMainTab(tab) {
   const brandsEl   = document.getElementById('tab-brands');
   const assetsEl   = document.getElementById('tab-assets');
 
-  const showBriefing = tab === 'briefing';
+  const showBriefing = tab === 'briefing' || isCategory;
   if (briefingEl) briefingEl.style.display = showBriefing ? '' : 'none';
   if (statsBar)   statsBar.style.display   = showBriefing ? '' : 'none';
   if (regionBar)  regionBar.style.display  = showBriefing ? '' : 'none';
 
-  ransomEl.style.display                     = tab === 'ransom' ? 'block' : 'none';
-  aptEl.style.display                        = tab === 'apt'    ? 'block' : 'none';
-  if (brandsEl) brandsEl.style.display       = tab === 'brands' ? 'block' : 'none';
-  if (assetsEl) assetsEl.style.display       = tab === 'assets' ? 'block' : 'none';
+  ransomEl.style.display                     = tab === 'ransom'  ? 'block' : 'none';
+  aptEl.style.display                        = tab === 'apt'     ? 'block' : 'none';
+  if (brandsEl) brandsEl.style.display       = tab === 'brands'  ? 'block' : 'none';
+  if (assetsEl) assetsEl.style.display       = tab === 'assets'  ? 'block' : 'none';
 
   const main = document.getElementById('main-content');
   if (main) main.scrollTop = 0;
 
-  if (tab !== 'brands') _selectedBrand = null;
-  if (tab !== 'assets') _selectedVendor = null;
+  // Clear watch filter when leaving brands/tech
+  if (tab !== 'brands' && tab !== 'assets') {
+    _selectedBrand = null;
+    _selectedVendor = null;
+    if (state.watchFilter) {
+      state.watchFilter = null;
+      updateWatchFilterBanner();
+    }
+  }
 
-  if (tab === 'ransom') renderRansomTracker();
-  if (tab === 'apt')    renderAPTTracker();
-  if (tab === 'brands') renderBrandsTab();
-  if (tab === 'assets') renderAssetsTab();
+  // Map tab to left-panel filter
+  if (tab === 'briefing') {
+    state.activeFilter = 'all';
+  } else if (isCategory) {
+    state.activeFilter = tab;
+  } else if (tab === 'ransom') {
+    state.activeFilter = 'ransomware';
+  } else if (tab === 'apt') {
+    state.activeFilter = 'apt';
+  } else {
+    state.activeFilter = 'all';
+  }
+
+  state.activeSector = null;
+  state.activeActor = null;
+  state.activeCategory = null;
+  state._actionDrilldown = null;
+
+  renderFeedCards();
+  buildThreatCategoryChart([], state.newsItems);
+
+  if (tab === 'ransom')  renderRansomTracker();
+  if (tab === 'apt')     renderAPTTracker();
+  if (tab === 'brands')  renderBrandsTab();
+  if (tab === 'assets')  renderAssetsTab();
 }
 
 /* ============================================================= */
@@ -4780,14 +4823,33 @@ function showWatchDetail(item, backTab) {
 let _selectedBrand = null;
 let _selectedVendor = null;
 
+function updateWatchFilterBanner() {
+  const banner = document.getElementById('watch-filter-banner');
+  if (!banner) return;
+  if (!state.watchFilter) {
+    banner.style.display = 'none';
+    return;
+  }
+  const typeLabel = state.watchFilter.type === 'brand' ? 'BRAND' : 'TECH';
+  const clearFn   = state.watchFilter.type === 'brand' ? 'selectBrand(null)' : 'selectVendor(null)';
+  banner.style.display = 'flex';
+  banner.innerHTML = `<span>${typeLabel}: ${escapeHTML(state.watchFilter.name)}</span><span style="cursor:pointer;opacity:0.7" onclick="${clearFn}">CLEAR ×</span>`;
+}
+
 function selectBrand(name) {
   _selectedBrand = (_selectedBrand === name || name === null) ? null : name;
+  state.watchFilter = _selectedBrand ? { type: 'brand', name: _selectedBrand } : null;
   renderBrandsTab();
+  renderFeedCards();
+  updateWatchFilterBanner();
 }
 
 function selectVendor(name) {
   _selectedVendor = (_selectedVendor === name || name === null) ? null : name;
+  state.watchFilter = _selectedVendor ? { type: 'vendor', name: _selectedVendor } : null;
   renderAssetsTab();
+  renderFeedCards();
+  updateWatchFilterBanner();
 }
 
 function renderBrandsTab() {
@@ -4827,39 +4889,6 @@ function renderBrandsTab() {
         <div><div class="apt-stat-val" style="font-size:12px;padding-top:2px">${lastSeen}</div><div class="apt-stat-label">LAST SEEN</div></div>
       </div>
       <div class="apt-activity-bar"><div class="apt-activity-fill" style="width:${pct}%"></div></div>
-    </div>`;
-  });
-  html += '</div>';
-
-  let displayItems;
-  if (_selectedBrand) {
-    const bd = brandData.find(b => b.brand === _selectedBrand);
-    displayItems = bd ? bd.matches : [];
-  } else {
-    const seen = new Set();
-    displayItems = brandData.flatMap(b => b.matches)
-      .filter(i => { if (seen.has(i._id)) return false; seen.add(i._id); return true; })
-      .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
-  }
-
-  const label = _selectedBrand
-    ? `${_selectedBrand} — ${displayItems.length} article${displayItems.length !== 1 ? 's' : ''}`
-    : `All Brand Activity — ${displayItems.length} article${displayItems.length !== 1 ? 's' : ''}`;
-
-  html += `<div class="apt-articles-section">
-    <div class="apt-section-title">
-      ${escapeHTML(label)}
-      ${_selectedBrand ? `<span class="apt-section-count" style="cursor:pointer" onclick="selectBrand(null)">CLEAR ×</span>` : ''}
-    </div>`;
-  displayItems.slice(0, 30).forEach(item => {
-    const snip = (item.description || '').replace(/<[^>]*>/g, '').trim();
-    html += `<div class="apt-article-row" data-id="${item._id}">
-      <div class="apt-article-dot"></div>
-      <div class="apt-article-title-wrap">
-        <div class="apt-article-title">${escapeHTML(item.title)}</div>
-        ${snip ? `<div class="apt-article-snippet">${escapeHTML(snip)}</div>` : ''}
-      </div>
-      <div class="apt-article-time">${_timeAgo(item.pubDate)}</div>
     </div>`;
   });
   html += '</div>';
@@ -4920,39 +4949,6 @@ function renderAssetsTab() {
         <div><div class="apt-stat-val" style="font-size:12px;padding-top:2px">${lastSeen}</div><div class="apt-stat-label">LAST SEEN</div></div>
       </div>
       <div class="apt-activity-bar"><div class="apt-activity-fill" style="width:${pct}%"></div></div>
-    </div>`;
-  });
-  html += '</div>';
-
-  let displayItems;
-  if (_selectedVendor) {
-    const vd = vendorData.find(v => v.vendor === _selectedVendor);
-    displayItems = vd ? vd.matches : [];
-  } else {
-    const seen = new Set();
-    displayItems = vendorData.flatMap(v => v.matches)
-      .filter(i => { if (seen.has(i._id)) return false; seen.add(i._id); return true; })
-      .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
-  }
-
-  const label = _selectedVendor
-    ? `${_selectedVendor} — ${displayItems.length} article${displayItems.length !== 1 ? 's' : ''}`
-    : `All Tech Activity — ${displayItems.length} article${displayItems.length !== 1 ? 's' : ''}`;
-
-  html += `<div class="apt-articles-section">
-    <div class="apt-section-title">
-      ${escapeHTML(label)}
-      ${_selectedVendor ? `<span class="apt-section-count" style="cursor:pointer" onclick="selectVendor(null)">CLEAR ×</span>` : ''}
-    </div>`;
-  displayItems.slice(0, 30).forEach(item => {
-    const snip = (item.description || '').replace(/<[^>]*>/g, '').trim();
-    html += `<div class="apt-article-row" data-id="${item._id}">
-      <div class="apt-article-dot"></div>
-      <div class="apt-article-title-wrap">
-        <div class="apt-article-title">${escapeHTML(item.title)}</div>
-        ${snip ? `<div class="apt-article-snippet">${escapeHTML(snip)}</div>` : ''}
-      </div>
-      <div class="apt-article-time">${_timeAgo(item.pubDate)}</div>
     </div>`;
   });
   html += '</div>';
