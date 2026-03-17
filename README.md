@@ -279,13 +279,13 @@ See [SECURITY.md](SECURITY.md) for the security policy and how to report vulnera
 
 ThreatWatch is **open source for non-commercial use**. You are free to use, modify, and distribute it for personal, educational, and non-profit purposes.
 
-**Commercial use requires a separate licence.** See [LICENSE](LICENSE) for the full terms or contact [nicholaiimbong@gmail.com](mailto:nicholaiimbong@gmail.com) to discuss commercial licensing.
+**Commercial use requires a separate licence.** See [LICENSE](LICENSE) for the full terms or contact [nicholai.me](https://nicholai.me) to discuss commercial licensing.
 
 ---
 
 <div align="center">
 
-by [Nicholai Imbong](https://github.com/nicholaiimbong) · [AuvaLabs](https://github.com/AuvaLabs)
+by [nicholai.me](https://nicholai.me) · [AuvaLabs](https://github.com/AuvaLabs)
 
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/nicholaiimbong)
 
