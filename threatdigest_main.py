@@ -29,6 +29,7 @@ from modules.feed_health import log_health_summary
 from modules.webhook import dispatch as webhook_dispatch
 from modules.watchlist_monitor import tag_articles_with_vendors, run_watchlist_monitor
 from modules.newsapi_fetcher import fetch_newsapi_articles
+from modules.region_inferrer import infer_articles_regions
 
 
 def enrich_articles(articles, summarize=False, stats=None):
@@ -151,6 +152,8 @@ def main():
     enriched_articles = enrich_articles(unique_articles, summarize=True, stats=stats)
     # Tag every article with matching suggest-list vendors (fast regex pass)
     enriched_articles = tag_articles_with_vendors(enriched_articles)
+    # Refine region assignments using content-based inference
+    enriched_articles = infer_articles_regions(enriched_articles)
     stats.articles_enriched = len(enriched_articles)
     if not enriched_articles:
         logging.info("No cyberattack-related articles after enrichment.")

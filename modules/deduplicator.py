@@ -265,6 +265,19 @@ def deduplicate_articles(articles):
     return unique_articles
 
 
+_MAX_MERGED_REGIONS = 3  # collapse to Global if more than this many regions merge
+
+
+def _collapse_regions(regions: set) -> str:
+    """Return a region string, collapsing to 'Global' if too many regions merged."""
+    regions.discard("Global")
+    if not regions:
+        return "Global"
+    if len(regions) > _MAX_MERGED_REGIONS:
+        return "Global"
+    return ",".join(sorted(regions))
+
+
 def _merge_region(original, duplicate):
     """Merge feed_region from duplicate into the original article."""
     orig_region = original.get("feed_region", "Global")
@@ -272,8 +285,7 @@ def _merge_region(original, duplicate):
     if dup_region and dup_region != orig_region:
         existing = set(orig_region.split(","))
         existing.add(dup_region)
-        existing.discard("Global")
-        original["feed_region"] = ",".join(sorted(existing)) if existing else "Global"
+        original["feed_region"] = _collapse_regions(existing)
 
 
 def _add_related(unique_articles, duplicate_article, index, dup_normalized,
@@ -290,8 +302,7 @@ def _add_related(unique_articles, duplicate_article, index, dup_normalized,
         if orig_region != dup_region:
             existing_regions = set(orig_region.split(","))
             existing_regions.add(dup_region)
-            existing_regions.discard("Global")
-            original["feed_region"] = ",".join(sorted(existing_regions)) if existing_regions else "Global"
+            original["feed_region"] = _collapse_regions(existing_regions)
 
         related = original.get("related_articles", [])
         related.append({

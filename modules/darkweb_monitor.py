@@ -307,40 +307,95 @@ def _parse_date(date_str):
 
 
 def _country_to_region(country):
-    """Map country name to feed region."""
+    """Map country name or ISO-2 code to feed region.
+
+    Handles both full country names (e.g. "Germany") and ISO 3166-1 alpha-2
+    codes as returned by ransomware.live (e.g. "DE", "FR", "GB").
+    """
     if not country:
         return "Global"
 
-    country_lower = country.lower()
-    na = {"usa", "us", "united states", "canada", "mexico"}
-    emea = {
-        "uk", "united kingdom", "germany", "france", "italy", "spain",
-        "netherlands", "poland", "sweden", "norway", "finland", "denmark",
-        "switzerland", "austria", "belgium", "ireland", "portugal",
-        "czech republic", "romania", "hungary", "greece", "south africa",
-    }
-    mena = {
-        "uae", "united arab emirates", "saudi arabia", "israel", "iran",
-        "turkey", "egypt", "qatar", "kuwait", "bahrain", "jordan", "iraq",
-    }
-    apac = {
-        "japan", "australia", "india", "singapore", "south korea", "china",
-        "taiwan", "indonesia", "malaysia", "thailand", "vietnam", "philippines",
-        "new zealand", "hong kong", "pakistan", "bangladesh",
-    }
-    latam = {
-        "brazil", "argentina", "colombia", "chile", "peru", "mexico",
-        "costa rica", "panama", "ecuador", "venezuela",
+    country_lower = country.lower().strip()
+
+    # ISO 2-letter code → region
+    _ISO2 = {
+        # North America
+        "us": "US", "ca": "US", "mx": "LATAM",
+        # Europe / EMEA
+        "gb": "Europe", "uk": "Europe", "de": "Europe", "fr": "Europe",
+        "it": "Europe", "es": "Europe", "nl": "Europe", "pl": "Europe",
+        "se": "Europe", "no": "Europe", "fi": "Europe", "dk": "Europe",
+        "ch": "Europe", "at": "Europe", "be": "Europe", "ie": "Europe",
+        "pt": "Europe", "cz": "Europe", "ro": "Europe", "hu": "Europe",
+        "gr": "Europe", "bg": "Europe", "hr": "Europe", "sk": "Europe",
+        "si": "Europe", "lt": "Europe", "lv": "Europe", "ee": "Europe",
+        "lu": "Europe", "cy": "Europe", "mt": "Europe", "al": "Europe",
+        "rs": "Europe", "ua": "Europe", "ba": "Europe", "me": "Europe",
+        "mk": "Europe", "md": "Europe", "by": "Europe", "za": "Europe",
+        "ng": "Europe", "ke": "Europe", "et": "Europe", "gh": "Europe",
+        # Middle East / North Africa
+        "ae": "Middle East", "sa": "Middle East", "il": "Middle East",
+        "ir": "Middle East", "tr": "Middle East", "eg": "Middle East",
+        "qa": "Middle East", "kw": "Middle East", "bh": "Middle East",
+        "jo": "Middle East", "iq": "Middle East", "lb": "Middle East",
+        "om": "Middle East", "ye": "Middle East", "sy": "Middle East",
+        "ps": "Middle East", "ly": "Middle East", "ma": "Middle East",
+        "tn": "Middle East", "dz": "Middle East",
+        # APAC
+        "jp": "APAC", "au": "APAC", "in": "APAC", "sg": "APAC",
+        "kr": "APAC", "cn": "APAC", "tw": "APAC", "id": "APAC",
+        "my": "APAC", "th": "APAC", "vn": "APAC", "ph": "APAC",
+        "nz": "APAC", "hk": "APAC", "pk": "APAC", "bd": "APAC",
+        "lk": "APAC", "mm": "APAC", "kh": "APAC", "np": "APAC",
+        # LATAM
+        "br": "LATAM", "ar": "LATAM", "co": "LATAM", "cl": "LATAM",
+        "pe": "LATAM", "ec": "LATAM", "ve": "LATAM", "py": "LATAM",
+        "uy": "LATAM", "bo": "LATAM", "cr": "LATAM", "pa": "LATAM",
+        "gt": "LATAM", "hn": "LATAM", "sv": "LATAM", "ni": "LATAM",
+        "do": "LATAM", "cu": "LATAM", "pr": "LATAM",
     }
 
-    if country_lower in na:
+    if len(country_lower) == 2 and country_lower in _ISO2:
+        return _ISO2[country_lower]
+
+    # Full country name → region
+    _NA = {"usa", "united states", "canada"}
+    _EMEA = {
+        "united kingdom", "germany", "france", "italy", "spain",
+        "netherlands", "poland", "sweden", "norway", "finland", "denmark",
+        "switzerland", "austria", "belgium", "ireland", "portugal",
+        "czech republic", "romania", "hungary", "greece", "bulgaria",
+        "croatia", "slovakia", "slovenia", "serbia", "ukraine", "belarus",
+        "south africa", "nigeria", "kenya", "ethiopia", "ghana",
+        "russia", "russian federation",
+    }
+    _MENA = {
+        "uae", "united arab emirates", "saudi arabia", "israel", "iran",
+        "turkey", "egypt", "qatar", "kuwait", "bahrain", "jordan", "iraq",
+        "lebanon", "oman", "yemen", "syria", "libya", "morocco",
+        "tunisia", "algeria",
+    }
+    _APAC = {
+        "japan", "australia", "india", "singapore", "south korea", "china",
+        "taiwan", "indonesia", "malaysia", "thailand", "vietnam", "philippines",
+        "new zealand", "hong kong", "pakistan", "bangladesh", "sri lanka",
+        "myanmar", "cambodia", "nepal",
+    }
+    _LATAM = {
+        "brazil", "argentina", "colombia", "chile", "peru", "mexico",
+        "ecuador", "venezuela", "paraguay", "uruguay", "bolivia",
+        "costa rica", "panama", "guatemala", "honduras", "el salvador",
+        "nicaragua", "dominican republic", "cuba", "puerto rico",
+    }
+
+    if country_lower in _NA:
         return "US"
-    if country_lower in emea:
+    if country_lower in _EMEA:
         return "Europe"
-    if country_lower in mena:
+    if country_lower in _MENA:
         return "Middle East"
-    if country_lower in apac:
+    if country_lower in _APAC:
         return "APAC"
-    if country_lower in latam:
+    if country_lower in _LATAM:
         return "LATAM"
     return "Global"
