@@ -1,21 +1,61 @@
-MIT License
+ThreatWatch Non-Commercial License
+Version 1.0 — 2026
 
-Copyright (c) 2026 ThreatWatch Contributors
+Copyright (c) 2026 Nicholai Imbong / AuvaLabs
+https://github.com/AuvaLabs/ThreatWatch
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+---
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+TERMS AND CONDITIONS
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+1. GRANT OF LICENSE
+
+   Permission is hereby granted, free of charge, to any person obtaining a
+   copy of this software and associated documentation files (the "Software"),
+   to use, copy, modify, merge, and distribute the Software, subject to the
+   following conditions:
+
+2. NON-COMMERCIAL USE ONLY
+
+   The Software may only be used for non-commercial purposes. You may NOT:
+
+   a. Use the Software, or any derivative work, to provide a paid product or
+      service to third parties.
+   b. Use the Software as part of a platform, SaaS, or hosted service where
+      access or use is sold, licensed, or monetised.
+   c. Sublicense or resell the Software or any derivative work.
+   d. Use the Software in a commercial organisation's production environment
+      without a separate written commercial licence from the copyright holder.
+
+   "Non-commercial purposes" includes personal use, academic research,
+   educational use, and use by registered non-profit organisations, provided
+   no monetary compensation is received in connection with such use.
+
+3. ATTRIBUTION
+
+   All copies or substantial portions of the Software, whether original or
+   modified, must retain this licence notice and the copyright statement
+   above.
+
+4. DERIVATIVE WORKS
+
+   You may create and distribute derivative works under these same terms,
+   provided that the derivative work is clearly marked as modified and the
+   original authorship is credited.
+
+5. COMMERCIAL LICENSING
+
+   If you wish to use ThreatWatch for commercial purposes, please contact
+   the copyright holder to obtain a commercial licence:
+
+   nicholaiimbong@gmail.com | https://github.com/AuvaLabs
+
+6. DISCLAIMER
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+   OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+   IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+   CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+   TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+   SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
