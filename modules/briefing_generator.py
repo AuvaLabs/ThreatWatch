@@ -70,10 +70,13 @@ def _detect_provider():
     return "openai"
 
 
+_MAX_DIGEST_ARTICLES = 80  # articles sent to the LLM
+
+
 def _build_digest(articles):
     """Build compact article digest for the prompt."""
     lines = []
-    for a in articles[:60]:
+    for a in articles[:_MAX_DIGEST_ARTICLES]:
         title = a.get("translated_title") or a.get("title", "")
         category = a.get("category", "Unknown")
         region = a.get("feed_region", "Global")
@@ -104,7 +107,7 @@ def _call_openai_compatible(user_content):
     url = f"{LLM_BASE_URL.rstrip('/')}/chat/completions"
     payload = {
         "model": LLM_MODEL,
-        "max_tokens": 1000,
+        "max_tokens": 1500,
         "temperature": 0.3,
         "messages": [
             {"role": "system", "content": _BRIEFING_PROMPT},
@@ -136,7 +139,7 @@ def _call_anthropic(user_content):
 
     response = client.messages.create(
         model=LLM_MODEL,
-        max_tokens=1000,
+        max_tokens=1500,
         system=[{
             "type": "text",
             "text": _BRIEFING_PROMPT,
@@ -172,7 +175,9 @@ def generate_briefing(articles):
         return None
 
     digest = _build_digest(articles)
-    cache_key = hashlib.sha256(digest[:MAX_CONTENT_CHARS].encode()).hexdigest()
+    # Hash the full digest — truncating to MAX_CONTENT_CHARS risks collision when
+    # article sets differ only in their later entries.
+    cache_key = hashlib.sha256(digest.encode()).hexdigest()
 
     # Check cache
     cached = get_cached_result(cache_key)
@@ -198,8 +203,22 @@ def generate_briefing(articles):
             logging.warning("Failed to parse AI briefing response.")
             return None
 
+        # Schema validation — reject silently-incomplete responses
+        required = {"threat_level", "executive_summary", "recommended_actions"}
+        missing = required - briefing.keys()
+        if missing:
+            logging.warning(f"AI briefing missing required fields: {missing}")
+            return None
+
+        # Normalise threat_level to known values
+        valid_levels = {"CRITICAL", "ELEVATED", "MODERATE", "GUARDED", "LOW"}
+        tl = (briefing.get("threat_level") or "").upper()
+        if tl not in valid_levels:
+            briefing["threat_level"] = "MODERATE"
+
         briefing["generated_at"] = datetime.now(timezone.utc).isoformat()
-        briefing["articles_analyzed"] = len(articles)
+        briefing["articles_analyzed"] = min(len(articles), _MAX_DIGEST_ARTICLES)
+        briefing["total_articles"] = len(articles)
         briefing["provider"] = f"{provider}/{LLM_MODEL}"
 
         cache_result(cache_key, briefing)

@@ -546,7 +546,7 @@ def build_dashboard():
     docs_path = BASE_DIR / "docs" / "index.html"
     docs_path.parent.mkdir(parents=True, exist_ok=True)
     with open(docs_path, "w", encoding="utf-8") as f:
-        f.write(html)
+        f.write(html_content)
     logging.info(f"Dashboard also deployed to {docs_path}")
 
 
