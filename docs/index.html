@@ -2725,7 +2725,7 @@ function renderBriefing(items, allText, globalTotal) {
   const malwareFound = actorsFound.filter(a => ['Malware','Stealer','Loader','RAT','Botnet','Tool','Proxy'].includes(a.type));
 
   // Build narrative briefing
-  const threatLevel = critCount > 5 ? 'ELEVATED' : critCount > 2 ? 'MODERATE' : highCount > 5 ? 'GUARDED' : 'STABLE';
+  const threatLevel = critCount > 5 ? 'ELEVATED' : critCount > 2 ? 'MODERATE' : highCount > 5 ? 'GUARDED' : 'LOW';
   const tlClass = critCount > 5 ? 'b-crit' : critCount > 2 ? 'b-warn' : highCount > 5 ? 'b-warn' : 'b-green';
 
   let b = '';
@@ -2896,6 +2896,17 @@ function renderAIBriefing(container) {
 
   let html = '';
 
+  // Staleness check — warn if briefing is older than 2 hours
+  const stalenessHtml = (() => {
+    if (!b.generated_at) return '';
+    const ageMs = Date.now() - new Date(b.generated_at).getTime();
+    const ageH = ageMs / 3600000;
+    if (ageH < 2) return '';
+    const label = ageH < 6 ? `${Math.round(ageH)}h old` : `${Math.round(ageH)}h old — may not reflect latest activity`;
+    return `<div style="margin-bottom:8px;padding:5px 9px;background:rgba(183,121,31,0.1);border:1px solid rgba(183,121,31,0.25);border-radius:4px;font-size:10px;color:var(--warning);letter-spacing:0.5px">&#9888; BRIEFING IS ${label.toUpperCase()}</div>`;
+  })();
+  html += stalenessHtml;
+
   // Threat level badge
   const tl = (b.threat_level || 'MODERATE').toUpperCase();
   html += `<div style="margin-bottom:12px"><span class="ai-threat-level ${tl}">${tl}</span>`;
@@ -2937,11 +2948,29 @@ function renderAIBriefing(container) {
     </div>`;
   }
 
-  // Recommended actions
+  // Recommended actions — each item tries to map to a feed drilldown
   if (b.recommended_actions && b.recommended_actions.length > 0) {
+    const _AI_ACTION_DRILLDOWNS = [
+      { re: /ransomware|ransom/i,       type: 'category', value: 'Ransomware' },
+      { re: /phish|email\s+security/i,  type: 'category', value: 'Phishing' },
+      { re: /patch|vuln|cve/i,          type: 'category', value: 'Vulnerability Disclosure' },
+      { re: /zero.?day/i,               type: 'category', value: 'Zero-Day Exploit' },
+      { re: /breach|data\s+loss/i,      type: 'category', value: 'Data Breach' },
+      { re: /ddos|denial/i,             type: 'category', value: 'DDoS' },
+      { re: /supply\s+chain/i,          type: 'category', value: 'Supply Chain Attack' },
+      { re: /nation.?state|apt|espion/i,type: 'category', value: 'Nation-State Attack' },
+      { re: /malware|endpoint|detect/i, type: 'category', value: 'Malware' },
+    ];
+    const actionItems = b.recommended_actions.map(action => {
+      const match = _AI_ACTION_DRILLDOWNS.find(r => r.re.test(action));
+      if (match) {
+        return `<li class="action-item" onclick="drilldownAction('${match.type}','${escapeHTML(match.value)}')" style="cursor:pointer" title="Show matching articles">&#x2192; ${escapeHTML(action)}</li>`;
+      }
+      return `<li class="action-item">${escapeHTML(action)}</li>`;
+    }).join('');
     html += `<div class="ai-briefing-section">
       <div class="ai-section-label">Recommended Actions</div>
-      <div class="ai-section-body"><ul>${b.recommended_actions.map(a => `<li>${escapeHTML(a)}</li>`).join('')}</ul></div>
+      <div class="ai-section-body"><ul>${actionItems}</ul></div>
     </div>`;
   }
 
@@ -2953,9 +2982,12 @@ function renderAIBriefing(container) {
     </div>`;
   }
 
-  // Timestamp
+  // Timestamp + provenance
   const genAt = b.generated_at ? new Date(b.generated_at).toUTCString().slice(0, 25) : 'N/A';
-  html += `<div class="briefing-timestamp">AI BRIEFING GENERATED ${genAt} UTC | ${b.articles_analyzed || '?'} ARTICLES ANALYZED</div>`;
+  const totalNote = b.total_articles && b.total_articles > b.articles_analyzed
+    ? ` of ${b.total_articles}` : '';
+  const modelLabel = b.provider ? ` | ${b.provider}` : '';
+  html += `<div class="briefing-timestamp">AI BRIEFING GENERATED ${genAt} UTC | ${b.articles_analyzed || '?'}${totalNote} ARTICLES ANALYZED${modelLabel}</div>`;
 
   container.innerHTML = html;
 }
