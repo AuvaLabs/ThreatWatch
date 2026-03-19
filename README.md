@@ -11,7 +11,7 @@
 [![Feeds](https://img.shields.io/badge/feeds-155+-blue)]()
 [![GitHub Stars](https://img.shields.io/github/stars/AuvaLabs/ThreatWatch?style=social)](https://github.com/AuvaLabs/ThreatWatch)
 
-**[Live Demo](https://threatwatch.auvalabs.com)** · **[GitHub Pages](https://auvalabs.github.io/threatwatch/)**
+**[Live Demo](https://threatwatch.auvalabs.com)** · **[GitHub Pages](https://auvalabs.github.io/ThreatWatch/)**
 
 Aggregates threat intelligence from 155+ RSS feeds, dark web sources, and NewsAPI — classifies by category and region, deduplicates, and serves a live single-page dashboard. Runs on your own infrastructure. No API keys required.
 
