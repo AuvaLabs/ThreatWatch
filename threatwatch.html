@@ -619,36 +619,26 @@ html, body {
 .type-badge.cisa-kev { background: rgba(192,57,43,0.07); color: var(--danger); border: 1px solid rgba(192,57,43,0.18); font-weight: 700; }
 .type-badge.cve { background: rgba(26,86,219,0.07); color: var(--accent); border: 1px solid rgba(26,86,219,0.12); }
 
-/* Confidence badge tooltip */
-.conf-badge {
-  position: relative;
-  cursor: default;
-}
-.conf-badge::after {
-  content: attr(data-tip);
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--surface);
+/* Confidence badge tooltip (JS-powered, appended to body to avoid clipping) */
+.conf-badge { cursor: default; }
+#conf-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: var(--panel-solid, #161b22);
   color: var(--text-primary);
   border: 1px solid var(--panel-border);
-  border-radius: 5px;
-  padding: 6px 9px;
+  border-radius: 6px;
+  padding: 7px 10px;
   font-size: 11px;
   font-family: var(--font-body);
-  white-space: nowrap;
+  line-height: 1.45;
+  max-width: 260px;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.15s ease;
-  z-index: 100;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  max-width: 240px;
-  white-space: normal;
-  text-align: left;
-  line-height: 1.4;
+  transition: opacity 0.12s ease;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.35);
 }
-.conf-badge:hover::after { opacity: 1; }
+#conf-tooltip.visible { opacity: 1; }
 
 .card-title {
   font-family: var(--font-body);
@@ -1939,6 +1929,7 @@ body.self-hosted-mode .watch-section-desc .sh-only { display: inline; }
 <!-- __SSR_DATA__ -->
 </head>
 <body>
+<div id="conf-tooltip"></div>
 
 <div id="page-loader">
   <div class="loader-logo">THREATWATCH</div>
@@ -5063,6 +5054,25 @@ function renderAssetsTab() {
 document.addEventListener('DOMContentLoaded', () => {
   initWatchlist();
 });
+
+/* Confidence score tooltip — event delegation on body */
+(function() {
+  const tip = document.getElementById('conf-tooltip');
+  if (!tip) return;
+  document.body.addEventListener('mouseover', function(e) {
+    const badge = e.target.closest('.conf-badge');
+    if (!badge || !badge.dataset.tip) return;
+    tip.textContent = badge.dataset.tip;
+    const r = badge.getBoundingClientRect();
+    tip.style.left = Math.min(r.left, window.innerWidth - 270) + 'px';
+    tip.style.top  = (r.bottom + 6) + 'px';
+    tip.classList.add('visible');
+  });
+  document.body.addEventListener('mouseout', function(e) {
+    const badge = e.target.closest('.conf-badge');
+    if (badge) tip.classList.remove('visible');
+  });
+})();
 </script>
 
 </body>
