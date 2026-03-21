@@ -1,3 +1,5 @@
+import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 import os
@@ -34,4 +36,23 @@ def ensure_output_directory(path=None):
         Path(path).parent.mkdir(parents=True, exist_ok=True)
     else:
         Path("data/output").mkdir(parents=True, exist_ok=True)
+
+
+def extract_json(text):
+    """Extract a JSON object from text that may contain markdown fences or prose.
+
+    Tries json.loads first, then falls back to regex extraction.
+    Used by ai_engine and briefing_generator to parse LLM responses.
+    """
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        pass
+    match = re.search(r"\{[\s\S]*\}", text or "")
+    if match:
+        try:
+            return json.loads(match.group())
+        except json.JSONDecodeError:
+            pass
+    return None
 

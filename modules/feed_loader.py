@@ -3,12 +3,14 @@ import yaml
 import logging
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 def _validate_feed(feed, source_path):
     if not isinstance(feed, dict):
-        logging.warning(f"Skipping non-dict feed entry in {source_path}: {feed}")
+        logger.warning(f"Skipping non-dict feed entry in {source_path}: {feed}")
         return False
     if "url" not in feed or not feed["url"]:
-        logging.warning(f"Skipping feed missing required 'url' field in {source_path}: {feed}")
+        logger.warning(f"Skipping feed missing required 'url' field in {source_path}: {feed}")
         return False
     return True
 
@@ -23,7 +25,7 @@ def load_feeds_from_files(file_paths):
                     valid_feeds = [feed for feed in data if _validate_feed(feed, path)]
                     feeds.extend(valid_feeds)
                 else:
-                    logging.warning(f"{path} does not contain a list of feeds.")
+                    logger.warning(f"{path} does not contain a list of feeds.")
         except Exception as e:
-            logging.error(f"Failed to load {path}: {e}")
+            logger.error(f"Failed to load {path}: {e}")
     return feeds

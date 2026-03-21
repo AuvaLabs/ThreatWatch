@@ -3642,9 +3642,9 @@ function buildCardHTML(item) {
   return `<div class="feed-card ${sevClass}${activeClass}" data-id="${item._id}">
     ${newBadge}
     <div class="card-badges">
-      <span class="badge badge-src ${item.sourceClass}">${item.source}</span>
+      <span class="badge badge-src ${item.sourceClass}">${escapeHTML(item.source)}</span>
       ${item.isDarkweb && item.darkwebGroup ? `<span class="badge" style="background:rgba(192,57,43,0.07);color:var(--danger);border:1px solid rgba(192,57,43,0.18);font-size:8px">${escapeHTML(item.darkwebGroup)}</span>` : ''}
-      <span class="type-badge ${item.cssType}">${icon} ${item.type}</span>
+      <span class="type-badge ${item.cssType}">${icon} ${escapeHTML(item.type)}</span>
       ${confBadge}
       ${watchBadges}
       <span style="margin-left:auto;width:8px;height:8px;border-radius:50%;background:${sevDotColor};flex-shrink:0"></span>
@@ -3939,19 +3939,19 @@ function selectItem(item) {
 
   container.innerHTML = `
     <div class="detail-badges">
-      <span class="badge badge-src ${item.sourceClass}">${item.source}</span>
-      <span class="type-badge ${item.cssType}">${item.icon || ''} ${item.type}</span>
+      <span class="badge badge-src ${item.sourceClass}">${escapeHTML(item.source)}</span>
+      <span class="type-badge ${item.cssType}">${escapeHTML(item.icon || '')} ${escapeHTML(item.type)}</span>
       <span class="badge" style="background:rgba(255,255,255,0.05);color:${
         item.severity === 'CRITICAL' ? 'var(--danger)' :
         item.severity === 'HIGH' ? '#ff8c00' :
         item.severity === 'MEDIUM' ? 'var(--warning)' : '#778'
-      }">${item.severity}</span>
+      }">${escapeHTML(item.severity)}</span>
     </div>
     <div class="detail-headline">${escapeHTML(item.title)}</div>
     <div class="detail-meta">
       <div><strong>Source:</strong> ${escapeHTML(item.source)}</div>
       <div><strong>Published:</strong> ${new Date(item.pubDate).toUTCString()}</div>
-      <div><strong>Classification:</strong> ${item.type} / ${item.severity}</div>
+      <div><strong>Classification:</strong> ${escapeHTML(item.type)} / ${escapeHTML(item.severity)}</div>
       ${item.confidence ? `<div><strong>Confidence:</strong> <span style="color:var(--success)">${item.confidence}%</span></div>` : ''}
       ${item.aiCategory ? `<div><strong>Category:</strong> <span style="color:var(--accent)">${escapeHTML(item.aiCategory)}</span></div>` : ''}
       ${item.isDarkweb && item.darkwebGroup ? `<div><strong>Threat Group:</strong> <span style="color:var(--danger);font-weight:700">${escapeHTML(item.darkwebGroup)}</span></div>` : ''}
@@ -4275,9 +4275,9 @@ function updateMarquee() {
   const items = state.newsItems.slice(0, 30).map(item => {
     const sevClass = item.severity === 'CRITICAL' ? 'sev-crit' : item.severity === 'HIGH' ? 'sev-high' : '';
     return `<span class="sep">&bull;</span> ` +
-      `<span class="${sevClass}">[${item.type}]</span> ` +
+      `<span class="${sevClass}">[${escapeHTML(item.type)}]</span> ` +
       `<span class="headline">${escapeHTML(item.title.slice(0, 80))}</span> ` +
-      `<span class="src">&mdash; ${item.source}</span>`;
+      `<span class="src">&mdash; ${escapeHTML(item.source)}</span>`;
   });
 
   if (items.length === 0) return;

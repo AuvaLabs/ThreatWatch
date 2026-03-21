@@ -24,6 +24,7 @@ PORT = int(os.environ.get("PORT", 8098))
 CACHE_TTL = 30  # seconds
 SSR_PLACEHOLDER = "<!-- __SSR_DATA__ -->"
 WATCHLIST_WRITE_ENABLED = os.environ.get("WATCHLIST_WRITE_ENABLED", "").lower() in ("1", "true", "yes")
+WATCHLIST_TOKEN = os.environ.get("WATCHLIST_TOKEN", "")
 
 _cache = {}
 _ssr_lock = threading.Lock()
@@ -31,6 +32,7 @@ _ssr_lock = threading.Lock()
 # ── Rate limiting ─────────────────────────────────────────────────────────────
 _RATE_WINDOW  = 60   # seconds
 _RATE_LIMIT   = 120  # requests per window per IP
+_RATE_MAX_IPS = 10_000  # max tracked IPs to prevent memory leak
 _rate_buckets: dict = {}
 _rate_lock    = threading.Lock()
 
@@ -38,6 +40,13 @@ def _is_rate_limited(ip: str) -> bool:
     """Sliding-window rate limiter. Returns True if the IP has exceeded the limit."""
     now = time.monotonic()
     with _rate_lock:
+        # Evict stale IPs periodically to prevent unbounded memory growth
+        if len(_rate_buckets) > _RATE_MAX_IPS:
+            stale = [k for k, dq in _rate_buckets.items()
+                     if not dq or dq[-1] < now - _RATE_WINDOW]
+            for k in stale:
+                del _rate_buckets[k]
+
         dq = _rate_buckets.setdefault(ip, collections.deque())
         while dq and dq[0] < now - _RATE_WINDOW:
             dq.popleft()
@@ -52,8 +61,9 @@ _CSP = (
     "script-src 'self' 'unsafe-inline'; "
     "style-src 'self' 'unsafe-inline'; "
     "img-src 'self' data: blob:; "
-    "font-src 'self'; "
+    "font-src 'self' https://fonts.gstatic.com; "
     "connect-src 'self'; "
+    "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; "
     "frame-ancestors 'none';"
 )
 _SECURITY_HEADERS = {
@@ -62,6 +72,7 @@ _SECURITY_HEADERS = {
     "X-Content-Type-Options":    "nosniff",
     "Referrer-Policy":           "no-referrer",
     "Permissions-Policy":        "camera=(), microphone=(), geolocation=()",
+    "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
 }
 
 
@@ -126,9 +137,11 @@ def load_watchlist_data() -> dict:
         return {"brands": [], "assets": [], "updated_at": None}
 
 
+_watchlist_lock = threading.Lock()
+
+
 def save_watchlist_data(brands: list, assets: list) -> None:
-    """Persist watchlist to STATE_DIR/watchlist.json."""
-    from datetime import datetime, timezone
+    """Persist watchlist to STATE_DIR/watchlist.json (thread-safe)."""
     watchlist_path = BASE_DIR / "data" / "state" / "watchlist.json"
     watchlist_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -136,8 +149,11 @@ def save_watchlist_data(brands: list, assets: list) -> None:
         "assets": [str(a).strip() for a in assets if str(a).strip()],
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
-    with open(watchlist_path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2, ensure_ascii=False)
+    with _watchlist_lock:
+        tmp = watchlist_path.with_suffix(".tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, ensure_ascii=False)
+        tmp.replace(watchlist_path)
 
 
 def build_health() -> bytes:
@@ -197,8 +213,15 @@ def build_ssr_data():
         stats = load_stats()
         briefing = load_briefing()
 
+        # Strip full_content from SSR payload to reduce page size
+        # (full_content is only needed for article detail view via API)
+        ssr_articles = [
+            {k: v for k, v in a.items() if k != "full_content"}
+            for a in articles
+        ]
+
         ssr_payload = {
-            "articles": articles,
+            "articles": ssr_articles,
             "stats": stats,
             "briefing": briefing,
             "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -283,12 +306,26 @@ class ThreatWatchHandler(BaseHTTPRequestHandler):
         for name, value in _SECURITY_HEADERS.items():
             self.send_header(name, value)
 
+    # Endpoints that expose internal metrics — restrict CORS to same-origin only
+    _RESTRICTED_CORS_PATHS = frozenset({"/api/health", "/api/watchlist"})
+
     def _send_cors_headers(self):
-        """CORS only on /api/* routes — not on the HTML page."""
-        if self._is_api_path():
+        """CORS only on /api/* routes — restricted on sensitive endpoints."""
+        if not self._is_api_path():
+            return
+        path = urlparse(self.path).path.rstrip("/")
+        if path in self._RESTRICTED_CORS_PATHS:
+            origin = self.headers.get("Origin", "")
+            allowed = os.environ.get("CORS_ORIGIN", "")
+            if allowed and origin == allowed:
+                self.send_header("Access-Control-Allow-Origin", origin)
+                self.send_header("Vary", "Origin")
+            # If no CORS_ORIGIN configured or origin doesn't match, omit the header
+            # (browser will block the cross-origin request)
+        else:
             self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
     def _send_error_json(self, status, message):
         payload = json.dumps({"error": message}).encode("utf-8")
@@ -361,19 +398,29 @@ class ThreatWatchHandler(BaseHTTPRequestHandler):
                                       "Watchlist write not enabled on this instance. "
                                       "Set WATCHLIST_WRITE_ENABLED=true to allow.")
                 return
+            # Token auth when WATCHLIST_TOKEN is configured
+            if WATCHLIST_TOKEN:
+                auth = self.headers.get("Authorization", "")
+                if auth != f"Bearer {WATCHLIST_TOKEN}":
+                    self._send_error_json(HTTPStatus.UNAUTHORIZED, "Invalid or missing authorization token")
+                    return
             try:
                 length = int(self.headers.get("Content-Length", 0))
+                if length > 65536:  # 64 KB max payload
+                    self._send_error_json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "Payload too large")
+                    return
                 raw = self.rfile.read(length)
                 data = json.loads(raw)
-                brands = [str(b) for b in data.get("brands", []) if str(b).strip()]
-                assets = [str(a) for a in data.get("assets", []) if str(a).strip()]
+                brands = [str(b).strip()[:200] for b in data.get("brands", [])[:50] if str(b).strip()]
+                assets = [str(a).strip()[:200] for a in data.get("assets", [])[:50] if str(a).strip()]
                 save_watchlist_data(brands, assets)
                 body = json.dumps({"ok": True, "brands": len(brands), "assets": len(assets)}).encode()
-            except (json.JSONDecodeError, ValueError) as exc:
-                self._send_error_json(HTTPStatus.BAD_REQUEST, f"Invalid JSON: {exc}")
+            except (json.JSONDecodeError, ValueError):
+                self._send_error_json(HTTPStatus.BAD_REQUEST, "Invalid JSON payload")
                 return
             except OSError as exc:
-                self._send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, f"Write failed: {exc}")
+                logger.error("Watchlist write failed: %s", exc)
+                self._send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, "Write failed")
                 return
             self._send_body("application/json; charset=utf-8", body, False)
             return
@@ -452,15 +499,16 @@ class ThreatWatchHandler(BaseHTTPRequestHandler):
 
             if limit > 0:
                 page = articles[offset:offset + limit]
-                result = {
-                    "articles": page,
-                    "total": len(articles),
-                    "offset": offset,
-                    "limit": limit,
-                    "has_more": offset + limit < len(articles),
-                }
             else:
-                result = articles  # Backwards compatible: return full array
+                page = articles[offset:]
+
+            result = {
+                "articles": page,
+                "total": total,
+                "offset": offset,
+                "limit": limit,
+                "has_more": (offset + len(page)) < total,
+            }
 
             body = json.dumps(result, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
             self._send_body("application/json; charset=utf-8", body, head_only)
@@ -489,13 +537,13 @@ class ThreatWatchHandler(BaseHTTPRequestHandler):
         # Static routes
         route = STATIC_ROUTES.get(path)
         if route is None:
-            self._send_error_json(HTTPStatus.NOT_FOUND, f"Not found: {path}")
+            self._send_error_json(HTTPStatus.NOT_FOUND, "Not found")
             return
 
         try:
             body = read_cached(route["file"])
         except FileNotFoundError:
-            self._send_error_json(HTTPStatus.NOT_FOUND, f"Data file not available: {route['file'].name}")
+            self._send_error_json(HTTPStatus.NOT_FOUND, "Data file not available")
             return
         except OSError as exc:
             logger.error("Error reading %s: %s", route["file"], exc)

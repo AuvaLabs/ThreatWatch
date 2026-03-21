@@ -121,6 +121,49 @@ class TestBuildStixBundle:
         assert len(bundle["objects"]) == 1  # only identity
 
 
+class TestArticleConfidence:
+    def test_confidence_mapped_to_report(self):
+        article = {**SAMPLE_ARTICLE, "confidence": 85}
+        report = _article_to_report(article)
+        assert report["confidence"] == 85
+
+    def test_confidence_clamped_to_100(self):
+        article = {**SAMPLE_ARTICLE, "confidence": 150}
+        report = _article_to_report(article)
+        assert report["confidence"] == 100
+
+    def test_confidence_absent_when_not_in_article(self):
+        report = _article_to_report(SAMPLE_ARTICLE)
+        assert "confidence" not in report
+
+
+class TestRelationships:
+    def test_bundle_contains_relationships_when_iocs_present(self):
+        bundle = build_stix_bundle([SAMPLE_ARTICLE], [SAMPLE_IOC])
+        types = [o["type"] for o in bundle["objects"]]
+        assert "relationship" in types
+
+    def test_no_relationships_without_iocs(self):
+        bundle = build_stix_bundle([SAMPLE_ARTICLE], [])
+        types = [o["type"] for o in bundle["objects"]]
+        assert "relationship" not in types
+
+    def test_relationship_links_indicator_to_identity(self):
+        bundle = build_stix_bundle([], [SAMPLE_IOC])
+        rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
+        assert len(rels) == 1
+        assert rels[0]["relationship_type"] == "indicates"
+        assert rels[0]["target_ref"] == "identity--threatwatch-system"
+
+    def test_report_object_refs_include_indicators(self):
+        bundle = build_stix_bundle([SAMPLE_ARTICLE], [SAMPLE_IOC])
+        reports = [o for o in bundle["objects"] if o["type"] == "report"]
+        indicators = [o for o in bundle["objects"] if o["type"] == "indicator"]
+        assert len(reports) == 1
+        assert len(indicators) == 1
+        assert indicators[0]["id"] in reports[0]["object_refs"]
+
+
 class TestBuildStixBytes:
     def test_returns_valid_json_bytes(self):
         raw = build_stix_bytes([SAMPLE_ARTICLE])

@@ -1,4 +1,4 @@
-import html
+import html as html_mod
 import json
 import logging
 from datetime import datetime, timezone
@@ -330,9 +330,9 @@ footer {{
 """
 
     for cat, count in sorted_cats:
-        html += f'        <span class="cat-badge" onclick="filterCategory(\'{cat}\')">{cat} <span class="count">{count}</span></span>\n'
+        page_html += f'        <span class="cat-badge" onclick="filterCategory(\'{cat}\')">{cat} <span class="count">{count}</span></span>\n'
 
-    html += """    </div>
+    page_html += """    </div>
 </div>
 
 <div class="section">
@@ -341,13 +341,13 @@ footer {{
 """
 
     if not articles:
-        html += """    <div class="empty-state">
+        page_html += """    <div class="empty-state">
         <h3>No articles yet</h3>
         <p>The pipeline hasn't run yet. Articles will appear here after the first run.</p>
     </div>
 """
     else:
-        html += """    <table>
+        page_html += """    <table>
         <thead>
             <tr>
                 <th style="width:50%">Title</th>
@@ -370,23 +370,25 @@ footer {{
 
             conf_class = "conf-high" if confidence >= 80 else ("conf-med" if confidence >= 50 else "conf-low")
 
-            title_escaped = html.escape(title, quote=True)
-            summary_escaped = html.escape(summary.replace("\n", " "), quote=True)
-            title_display = html.escape(title)
+            title_escaped = html_mod.escape(title, quote=True)
+            summary_escaped = html_mod.escape(summary.replace("\n", " "), quote=True)
+            title_display = html_mod.escape(title)
+            category_escaped = html_mod.escape(category, quote=True)
+            link_escaped = html_mod.escape(link, quote=True)
 
-            html += f'            <tr data-category="{category}" data-title="{title_escaped.lower()}">\n'
-            html += f'                <td><a href="{link}" target="_blank" rel="noopener">{title_display}</a>'
+            page_html += f'            <tr data-category="{category_escaped}" data-title="{title_escaped.lower()}">\n'
+            page_html += f'                <td><a href="{link_escaped}" target="_blank" rel="noopener">{title_display}</a>'
             if summary:
-                html += f'<div class="summary-text">{summary_escaped[:140]}</div>'
+                page_html += f'<div class="summary-text">{summary_escaped[:140]}</div>'
             if related:
-                html += f'<span class="related-tag">+{len(related)} source{"s" if len(related) > 1 else ""}</span>'
-            html += '</td>\n'
-            html += f'                <td>{category}</td>\n'
-            html += f'                <td><span class="confidence {conf_class}">{confidence}%</span></td>\n'
-            html += f'                <td><span class="pub-date">{published}</span></td>\n'
-            html += '            </tr>\n'
+                page_html += f'<span class="related-tag">+{len(related)} source{"s" if len(related) > 1 else ""}</span>'
+            page_html += '</td>\n'
+            page_html += f'                <td>{category_escaped}</td>\n'
+            page_html += f'                <td><span class="confidence {conf_class}">{confidence}%</span></td>\n'
+            page_html += f'                <td><span class="pub-date">{published}</span></td>\n'
+            page_html += '            </tr>\n'
 
-        html += """        </tbody>
+        page_html += """        </tbody>
     </table>
     <div style="text-align:center;padding:16px 0">
         <button id="show-more-btn" onclick="showMore()"
@@ -398,7 +400,7 @@ footer {{
     </div>
 """
 
-    html += """</div>
+    page_html += """</div>
 
 <footer>
     ThreatWatch by AuvaLabs

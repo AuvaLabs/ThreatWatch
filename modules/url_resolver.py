@@ -5,6 +5,8 @@ import logging
 import re
 import socket
 import requests
+
+logger = logging.getLogger(__name__)
 from urllib.parse import urlparse, parse_qs
 from bs4 import BeautifulSoup
 
@@ -60,7 +62,7 @@ def is_safe_url(url: str) -> bool:
             ip = ipaddress.ip_address(ip_str)
             if (ip.is_private or ip.is_loopback or ip.is_link_local
                     or ip.is_reserved or ip.is_unspecified or ip.is_multicast):
-                logging.warning(f"SSRF blocked: {url} resolves to non-public IP {ip_str}")
+                logger.warning(f"SSRF blocked: {url} resolves to non-public IP {ip_str}")
                 return False
     except Exception:
         return False
@@ -105,7 +107,7 @@ def extract_embedded_url(url):
 # ==== Redirect Resolution via HEAD ====
 def follow_redirects(url):
     if not is_safe_url(url):
-        logging.debug(f"follow_redirects: blocked unsafe URL {url}")
+        logger.debug(f"follow_redirects: blocked unsafe URL {url}")
         return None
     try:
         response = requests.head(url, allow_redirects=True, timeout=5)
@@ -115,13 +117,13 @@ def follow_redirects(url):
         # Never return a Tor, I2P, or private-network address after redirect
         return final if is_safe_url(final) else None
     except requests.RequestException as e:
-        logging.warning(f"Redirect failed for {url}: {e}")
+        logger.warning(f"Redirect failed for {url}: {e}")
         return None
 
 # ==== Canonical URL Extraction from HTML ====
 def extract_canonical_from_html(url):
     if not is_safe_url(url):
-        logging.debug(f"extract_canonical: blocked unsafe URL {url}")
+        logger.debug(f"extract_canonical: blocked unsafe URL {url}")
         return url
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
@@ -131,7 +133,7 @@ def extract_canonical_from_html(url):
         if canonical and canonical.get('href'):
             return canonical['href']
     except Exception as e:
-        logging.warning(f"Failed to extract canonical URL from {url}: {e}")
+        logger.warning(f"Failed to extract canonical URL from {url}: {e}")
     return url
 
 # ==== Google News summary HTML extractor ====

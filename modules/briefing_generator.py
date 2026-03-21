@@ -14,6 +14,9 @@ Configure via environment variables:
 import json
 import logging
 import hashlib
+from typing import Any
+
+logger = logging.getLogger(__name__)
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -55,7 +58,7 @@ Respond ONLY with valid JSON (no markdown, no explanation):
 }"""
 
 
-def _detect_provider():
+def _detect_provider() -> str | None:
     """Auto-detect the LLM provider from config."""
     if LLM_PROVIDER != "auto":
         return LLM_PROVIDER
@@ -73,7 +76,7 @@ def _detect_provider():
 _MAX_DIGEST_ARTICLES = 80  # articles sent to the LLM
 
 
-def _build_digest(articles):
+def _build_digest(articles: list[dict[str, Any]]) -> str:
     """Build compact article digest for the prompt."""
     lines = []
     for a in articles[:_MAX_DIGEST_ARTICLES]:
@@ -87,7 +90,7 @@ def _build_digest(articles):
     return "\n".join(lines)
 
 
-def _get_http_session():
+def _get_http_session() -> requests.Session:
     """Return a requests session with retry logic for transient errors."""
     session = requests.Session()
     retry = Retry(
@@ -102,7 +105,7 @@ def _get_http_session():
     return session
 
 
-def _call_openai_compatible(user_content):
+def _call_openai_compatible(user_content: str) -> str:
     """Call any OpenAI-compatible API using requests with retry."""
     url = f"{LLM_BASE_URL.rstrip('/')}/chat/completions"
     payload = {
@@ -126,7 +129,7 @@ def _call_openai_compatible(user_content):
     return data["choices"][0]["message"]["content"].strip()
 
 
-def _call_anthropic(user_content):
+def _call_anthropic(user_content: str) -> str:
     """Call Anthropic API using the SDK."""
     import anthropic
     import httpx
@@ -159,7 +162,7 @@ def _call_anthropic(user_content):
     return response.content[0].text.strip()
 
 
-def generate_briefing(articles):
+def generate_briefing(articles: list[dict[str, Any]]) -> dict[str, Any] | None:
     """Generate an AI briefing from enriched articles.
 
     Works with any LLM provider configured via environment variables.
@@ -167,11 +170,11 @@ def generate_briefing(articles):
     """
     provider = _detect_provider()
     if not provider:
-        logging.info("No LLM API key configured — skipping AI briefing.")
+        logger.info("No LLM API key configured — skipping AI briefing.")
         return None
 
     if not articles:
-        logging.info("No articles to brief on.")
+        logger.info("No articles to brief on.")
         return None
 
     digest = _build_digest(articles)
@@ -182,7 +185,7 @@ def generate_briefing(articles):
     # Check cache
     cached = get_cached_result(cache_key)
     if cached is not None:
-        logging.info("AI briefing loaded from cache.")
+        logger.info("AI briefing loaded from cache.")
         _save_briefing(cached)
         return cached
 
@@ -200,14 +203,14 @@ def generate_briefing(articles):
 
         briefing = _parse_json(reply)
         if briefing is None:
-            logging.warning("Failed to parse AI briefing response.")
+            logger.warning("Failed to parse AI briefing response.")
             return None
 
         # Schema validation — reject silently-incomplete responses
         required = {"threat_level", "executive_summary", "recommended_actions"}
         missing = required - briefing.keys()
         if missing:
-            logging.warning(f"AI briefing missing required fields: {missing}")
+            logger.warning(f"AI briefing missing required fields: {missing}")
             return None
 
         # Normalise threat_level to known values
@@ -223,39 +226,26 @@ def generate_briefing(articles):
 
         cache_result(cache_key, briefing)
         _save_briefing(briefing)
-        logging.info(f"AI briefing generated via {provider}/{LLM_MODEL}.")
+        logger.info(f"AI briefing generated via {provider}/{LLM_MODEL}.")
         return briefing
 
     except Exception as e:
-        logging.error(f"AI briefing generation failed ({provider}): {e}")
+        logger.error(f"AI briefing generation failed ({provider}): {e}")
         return None
 
 
-def _parse_json(text):
-    """Extract JSON from response text."""
-    import re
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
-    match = re.search(r"\{[\s\S]*\}", text)
-    if match:
-        try:
-            return json.loads(match.group())
-        except json.JSONDecodeError:
-            pass
-    return None
+from modules.utils import extract_json as _parse_json
 
 
-def _save_briefing(briefing):
+def _save_briefing(briefing: dict[str, Any]) -> None:
     """Save briefing to disk for the server to serve."""
     BRIEFING_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(BRIEFING_PATH, "w", encoding="utf-8") as f:
         json.dump(briefing, f, ensure_ascii=False)
-    logging.info(f"Briefing saved to {BRIEFING_PATH}")
+    logger.info(f"Briefing saved to {BRIEFING_PATH}")
 
 
-def load_briefing():
+def load_briefing() -> dict[str, Any] | None:
     """Load the latest briefing from disk."""
     if not BRIEFING_PATH.exists():
         return None

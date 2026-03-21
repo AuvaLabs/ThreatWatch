@@ -86,7 +86,7 @@ Aggregates threat intelligence from 155+ RSS feeds, dark web sources, and NewsAP
 
 ```bash
 git clone https://github.com/AuvaLabs/threatwatch.git
-cd ThreatWatch
+cd threatwatch
 
 # Optional: configure environment
 cp .env.example .env   # edit as needed
@@ -101,7 +101,7 @@ The pipeline runs immediately on startup, then every 10 minutes. Dashboard is at
 
 ```bash
 git clone https://github.com/AuvaLabs/threatwatch.git
-cd ThreatWatch
+cd threatwatch
 
 python3 -m venv venv
 source venv/bin/activate
@@ -227,13 +227,64 @@ The server runs on port **8098** by default:
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/` | Dashboard (server-side rendered HTML) |
-| `GET` | `/api/articles` | All articles as JSON |
+| `GET` | `/api/articles` | All articles as JSON array |
 | `GET` | `/api/articles?offset=0&limit=20` | Paginated articles |
 | `GET` | `/api/briefing` | Threat intelligence briefing |
 | `GET` | `/api/stats` | Pipeline run statistics |
+| `GET` | `/api/health` | Server health + feed status |
+| `GET` | `/api/stix` | STIX 2.1 bundle export |
+| `GET` | `/api/watchlist` | Watchlist config + vendor list |
+| `POST` | `/api/watchlist` | Update watchlist (self-hosted) |
 | `GET` | `/api/rss` | RSS feed (XML) |
 
 All JSON endpoints support CORS, ETag conditional requests, and gzip compression.
+
+<details>
+<summary>Example: paginated articles response</summary>
+
+```json
+{
+  "articles": [
+    {
+      "title": "LockBit ransomware targets healthcare sector",
+      "translated_title": "LockBit ransomware targets healthcare sector",
+      "link": "https://example.com/article",
+      "published": "2026-03-21T10:00:00+00:00",
+      "category": "Ransomware",
+      "confidence": 95,
+      "is_cyber_attack": true,
+      "summary": "Brief summary of the article...",
+      "region": "US",
+      "assetTags": ["CrowdStrike"],
+      "related_articles": []
+    }
+  ],
+  "total": 150,
+  "offset": 0,
+  "limit": 20,
+  "has_more": true
+}
+```
+
+</details>
+
+<details>
+<summary>Example: health response</summary>
+
+```json
+{
+  "status": "ok",
+  "uptime_s": 3600,
+  "last_run_at": "2026-03-21T10:00:00+00:00",
+  "articles_total": 150,
+  "articles_cyber": 120,
+  "api_cost_today_usd": 0.05,
+  "feed_health": {"ok": 140, "dead": 5, "slow": 10},
+  "generated_at": "2026-03-21T10:05:00+00:00"
+}
+```
+
+</details>
 
 ---
 

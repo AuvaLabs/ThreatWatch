@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from threatdigest_main import enrich_articles
+from modules.run_stats import RunStats
 
 
 class TestEnrichArticles:
@@ -85,7 +86,155 @@ class TestEnrichArticles:
         }
 
         result = enrich_articles([article], summarize=True)
-        # enriched_article is a new dict (spread), so original should still have original keys
-        # But since we use {**article, ...}, the original dict is not mutated
         assert len(result) == 1
         assert "category" in result[0]
+
+    @patch("threatdigest_main.classify_article")
+    @patch("threatdigest_main.process_urls_in_parallel")
+    @patch("threatdigest_main.detect_language", return_value="en")
+    def test_stats_tracking_scrape_counts(self, mock_lang, mock_parallel, mock_classify):
+        """Verify scrape success/failure counts are tracked in stats."""
+        articles = [
+            self._make_article("A", "https://example.com/a"),
+            self._make_article("B", "https://example.com/b"),
+        ]
+        mock_parallel.return_value = {
+            "https://example.com/a": "content",
+            "https://example.com/b": None,  # scrape failure
+        }
+        mock_classify.return_value = {
+            "is_cyber_attack": True,
+            "category": "Malware",
+            "confidence": 90,
+            "translated_title": "Test",
+            "summary": "",
+        }
+
+        stats = RunStats()
+        enrich_articles(articles, summarize=True, stats=stats)
+        assert stats.scrape_successes == 1
+        assert stats.scrape_failures == 1
+
+    @patch("threatdigest_main.classify_article")
+    @patch("threatdigest_main.process_urls_in_parallel")
+    @patch("threatdigest_main.detect_language", return_value="en")
+    def test_stats_tracking_cache_hits(self, mock_lang, mock_parallel, mock_classify):
+        """Verify cache hit/miss counts are tracked in stats."""
+        article = self._make_article("Test", "https://example.com/5")
+        mock_parallel.return_value = {}
+        mock_classify.return_value = {
+            "is_cyber_attack": True,
+            "category": "Ransomware",
+            "confidence": 95,
+            "translated_title": "Test",
+            "summary": "",
+            "_cached": True,
+        }
+
+        stats = RunStats()
+        enrich_articles([article], summarize=True, stats=stats)
+        assert stats.cache_hits == 1
+        assert stats.cache_misses == 0
+
+    @patch("threatdigest_main.classify_article")
+    @patch("threatdigest_main.process_urls_in_parallel")
+    @patch("threatdigest_main.detect_language", return_value="en")
+    def test_stats_tracking_cache_misses(self, mock_lang, mock_parallel, mock_classify):
+        """Verify cache miss counts."""
+        article = self._make_article("Test", "https://example.com/6")
+        mock_parallel.return_value = {}
+        mock_classify.return_value = {
+            "is_cyber_attack": True,
+            "category": "Ransomware",
+            "confidence": 95,
+            "translated_title": "Test",
+            "summary": "",
+        }
+
+        stats = RunStats()
+        enrich_articles([article], summarize=True, stats=stats)
+        assert stats.cache_hits == 0
+        assert stats.cache_misses == 1
+
+    @patch("threatdigest_main.classify_article")
+    @patch("threatdigest_main.process_urls_in_parallel")
+    @patch("threatdigest_main.detect_language", return_value="en")
+    def test_stats_tracking_ai_escalations(self, mock_lang, mock_parallel, mock_classify):
+        """Verify AI escalation counts."""
+        article = self._make_article("Test", "https://example.com/7")
+        mock_parallel.return_value = {}
+        mock_classify.return_value = {
+            "is_cyber_attack": True,
+            "category": "APT",
+            "confidence": 99,
+            "translated_title": "Test",
+            "summary": "",
+            "_ai_enhanced": True,
+        }
+
+        stats = RunStats()
+        enrich_articles([article], summarize=True, stats=stats)
+        assert stats.ai_escalations == 1
+
+    @patch("threatdigest_main.classify_article")
+    @patch("threatdigest_main.process_urls_in_parallel")
+    @patch("threatdigest_main.detect_language", return_value="en")
+    def test_stats_tracking_non_cyber_count(self, mock_lang, mock_parallel, mock_classify):
+        """Verify non-cyber article counting."""
+        article = self._make_article("Sports", "https://example.com/8")
+        mock_parallel.return_value = {}
+        mock_classify.return_value = {
+            "is_cyber_attack": False,
+            "category": "Unknown",
+            "confidence": 10,
+            "translated_title": "Sports",
+            "summary": "",
+        }
+
+        stats = RunStats()
+        enrich_articles([article], summarize=True, stats=stats)
+        assert stats.non_cyber_articles == 1
+        assert stats.cyber_articles == 0
+
+    @patch("threatdigest_main.classify_article")
+    @patch("threatdigest_main.process_urls_in_parallel")
+    @patch("threatdigest_main.detect_language", return_value="en")
+    @patch("threatdigest_main.log_article_summary")
+    def test_logs_summary_when_summarize_enabled(self, mock_log, mock_lang, mock_parallel, mock_classify):
+        """Verify article summaries are logged when summarize=True."""
+        article = self._make_article("Attack", "https://example.com/9")
+        mock_parallel.return_value = {}
+        mock_classify.return_value = {
+            "is_cyber_attack": True,
+            "category": "Malware",
+            "confidence": 90,
+            "translated_title": "Attack",
+            "summary": "Detailed summary here.",
+        }
+
+        enrich_articles([article], summarize=True)
+        mock_log.assert_called_once_with("https://example.com/9", "Detailed summary here.")
+
+    @patch("threatdigest_main.classify_article")
+    @patch("threatdigest_main.process_urls_in_parallel")
+    @patch("threatdigest_main.detect_language", return_value="en")
+    def test_enriched_article_has_required_fields(self, mock_lang, mock_parallel, mock_classify):
+        """Verify the enriched article dict has all expected fields."""
+        article = self._make_article("Test Article", "https://example.com/10")
+        mock_parallel.return_value = {"https://example.com/10": "Content"}
+        mock_classify.return_value = {
+            "is_cyber_attack": True,
+            "category": "Phishing",
+            "confidence": 85,
+            "translated_title": "Test Article",
+            "summary": "Summary.",
+        }
+
+        result = enrich_articles([article], summarize=True)
+        assert len(result) == 1
+        enriched = result[0]
+        for field in ("translated_title", "language", "is_cyber_attack", "category",
+                      "confidence", "full_content", "summary", "timestamp"):
+            assert field in enriched, f"Missing field: {field}"
+        assert enriched["language"] == "en"
+        assert enriched["is_cyber_attack"] is True
