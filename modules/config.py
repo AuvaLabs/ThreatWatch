@@ -4,6 +4,8 @@ import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
@@ -81,16 +83,16 @@ DAILY_BUDGET_USD = float(os.getenv("DAILY_BUDGET_USD", "2.00"))
 
 def validate_config():
     if not ANTHROPIC_API_KEY:
-        logging.info(
+        logger.info(
             "ANTHROPIC_API_KEY not set — keyword classifier only (zero cost)."
         )
     else:
-        logging.info(
+        logger.info(
             "ANTHROPIC_API_KEY set — hybrid mode (keyword + AI escalation)."
         )
     if LLM_API_KEY:
-        logging.info(
+        logger.info(
             f"LLM configured — AI briefing enabled ({LLM_PROVIDER}/{LLM_MODEL} via {LLM_BASE_URL})."
         )
     else:
-        logging.info("No LLM API key — AI briefing disabled (zero cost).")
+        logger.info("No LLM API key — AI briefing disabled (zero cost).")

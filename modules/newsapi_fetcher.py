@@ -10,6 +10,8 @@ import hashlib
 import logging
 import os
 import time
+
+logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -46,7 +48,7 @@ def _save_last_call(ts: float) -> None:
         _LAST_CALL_FILE.parent.mkdir(parents=True, exist_ok=True)
         _LAST_CALL_FILE.write_text(str(ts))
     except Exception as e:
-        logging.warning(f"NewsAPI: could not save last call timestamp: {e}")
+        logger.warning(f"NewsAPI: could not save last call timestamp: {e}")
 
 
 def _normalize(article: dict) -> dict | None:
@@ -88,7 +90,7 @@ def fetch_newsapi_articles() -> list[dict]:
     """
     api_key = os.getenv("NEWSAPI_KEY")
     if not api_key:
-        logging.debug("NewsAPI: NEWSAPI_KEY not set, skipping")
+        logger.debug("NewsAPI: NEWSAPI_KEY not set, skipping")
         return []
 
     now = time.time()
@@ -96,7 +98,7 @@ def fetch_newsapi_articles() -> list[dict]:
     elapsed = now - last_call
     if elapsed < _NEWSAPI_INTERVAL:
         wait_min = (_NEWSAPI_INTERVAL - elapsed) / 60
-        logging.debug(f"NewsAPI: rate limit active, {wait_min:.1f}m until next call")
+        logger.debug(f"NewsAPI: rate limit active, {wait_min:.1f}m until next call")
         return []
 
     # Fetch articles published in the last 24 hours to avoid stale content
@@ -118,16 +120,16 @@ def fetch_newsapi_articles() -> list[dict]:
         resp.raise_for_status()
         data = resp.json()
     except Exception as e:
-        logging.error(f"NewsAPI: request failed: {e}")
+        logger.error(f"NewsAPI: request failed: {e}")
         return []
 
     if data.get("status") != "ok":
-        logging.warning(f"NewsAPI: non-ok response: {data.get('message', data.get('status'))}")
+        logger.warning(f"NewsAPI: non-ok response: {data.get('message', data.get('status'))}")
         return []
 
     _save_last_call(now)
 
     raw_articles = data.get("articles") or []
     articles = [a for a in (_normalize(r) for r in raw_articles) if a]
-    logging.info(f"NewsAPI: fetched {len(articles)} articles ({len(raw_articles)} raw)")
+    logger.info(f"NewsAPI: fetched {len(articles)} articles ({len(raw_articles)} raw)")
     return articles

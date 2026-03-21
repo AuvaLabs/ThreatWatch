@@ -2,6 +2,9 @@ import feedparser
 import hashlib
 import logging
 import requests
+from typing import Any
+
+logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from email.utils import parsedate_to_datetime
@@ -22,7 +25,7 @@ _FEED_TIMEOUT = 10  # seconds
 _session = None
 
 
-def _get_session():
+def _get_session() -> requests.Session:
     global _session
     if _session is None:
         _session = requests.Session()
@@ -39,7 +42,7 @@ def _get_session():
     return _session
 
 
-def _fetch_feed(url, region="Global"):
+def _fetch_feed(url: str, region: str = "Global") -> list[dict[str, Any]]:
     try:
         session = _get_session()
         resp = session.get(url, timeout=_FEED_TIMEOUT)
@@ -51,7 +54,7 @@ def _fetch_feed(url, region="Global"):
             raw_link = getattr(entry, "link", "") or ""
             # Drop articles whose primary link is a Tor/I2P address
             if not is_clearnet_url(raw_link):
-                logging.debug(f"Non-clearnet link skipped: {raw_link[:80]}")
+                logger.debug(f"Non-clearnet link skipped: {raw_link[:80]}")
                 continue
             raw_summary = entry.get("summary", "") or ""
             clean_link = resolve_original_url(raw_link, summary=raw_summary)
@@ -85,17 +88,17 @@ def _fetch_feed(url, region="Global"):
             filtered.append(r)
 
         skipped = len(results) - len(filtered)
-        logging.info(f"Fetched {len(filtered)} articles from {url} ({skipped} older than {FEED_CUTOFF_DAYS} days filtered)")
+        logger.info(f"Fetched {len(filtered)} articles from {url} ({skipped} older than {FEED_CUTOFF_DAYS} days filtered)")
         record_fetch(url, success=True, entry_count=len(filtered))
         return filtered
 
     except Exception as e:
-        logging.error(f"Error fetching {url}: {e}")
+        logger.error(f"Error fetching {url}: {e}")
         record_fetch(url, success=False, entry_count=0)
         return []
 
 
-def fetch_articles(feeds_config):
+def fetch_articles(feeds_config: list[dict[str, Any]]) -> list[dict[str, Any]]:
     all_articles = []
     with ThreadPoolExecutor(max_workers=8) as executor:
         futures = {
@@ -108,7 +111,7 @@ def fetch_articles(feeds_config):
                 articles = future.result()
                 all_articles.extend(articles)
             except Exception as e:
-                logging.error(f"Exception fetching {url}: {e}")
+                logger.error(f"Exception fetching {url}: {e}")
 
-    logging.info(f"Total articles fetched: {len(all_articles)}")
+    logger.info(f"Total articles fetched: {len(all_articles)}")
     return all_articles

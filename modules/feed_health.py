@@ -17,6 +17,8 @@ import logging
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 from modules.config import STATE_DIR
 
 HEALTH_FILE = STATE_DIR / "feed_health.json"
@@ -119,16 +121,16 @@ def record_fetch(url: str, success: bool, entry_count: int = 0) -> None:
 
     # Warn on degraded state
     if entry["status"] == "dead":
-        logging.warning(
+        logger.warning(
             f"DEAD FEED — {_days_since(entry['first_error']):.0f}d of errors: {url}"
         )
     elif entry["status"] == "suspect":
-        logging.warning(
+        logger.warning(
             f"SUSPECT FEED — {entry['consecutive_errors']} consecutive errors: {url}"
         )
     elif entry["status"] == "stale":
         last_ok = entry.get("last_success", "never")
-        logging.warning(f"STALE FEED — no entries in 30d+ (last ok: {last_ok[:10] if last_ok else 'never'}): {url}")
+        logger.warning(f"STALE FEED — no entries in 30d+ (last ok: {last_ok[:10] if last_ok else 'never'}): {url}")
 
 
 # ── reporting ───────────────────────────────────────────────────────────────
@@ -150,11 +152,11 @@ def log_health_summary() -> None:
     stale   = len(report.get("stale", []))
     ok      = len(report.get("ok", []))
     if dead or suspect or stale:
-        logging.warning(
+        logger.warning(
             f"Feed health — ok:{ok} stale:{stale} suspect:{suspect} dead:{dead}"
         )
     else:
-        logging.info(f"Feed health — all {ok} feeds ok")
+        logger.info(f"Feed health — all {ok} feeds ok")
 
 
 def print_report() -> None:

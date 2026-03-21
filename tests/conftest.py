@@ -119,17 +119,56 @@ def _make_bs4_mock():
 
 
 def _make_feedgen_mock():
-    """Minimal feedgen mock."""
+    """Minimal feedgen mock matching the real feedgen.feed API surface."""
     mod = types.ModuleType("feedgen")
     feed_mod = types.ModuleType("feedgen.feed")
 
     class FeedEntry:
-        def title(self, *a, **kw): pass
-        def link(self, *a, **kw): pass
-        def description(self, *a, **kw): pass
-        def pubDate(self, *a, **kw): pass
+        def __init__(self):
+            self._title = None
+            self._link = None
+            self._guid = None
+            self._guid_permalink = False
+            self._description = None
+            self._category = None
+            self._pub_date = None
+
+        def title(self, val=None, *a, **kw):
+            if val is not None:
+                self._title = val
+            return self._title
+
+        def link(self, *a, **kw):
+            href = kw.get("href") or (a[0] if a else None)
+            if href is not None:
+                self._link = href
+            return self._link
+
+        def guid(self, val=None, permalink=False, **kw):
+            if val is not None:
+                self._guid = val
+                self._guid_permalink = permalink
+            return self._guid
+
+        def description(self, val=None, *a, **kw):
+            if val is not None:
+                self._description = val
+            return self._description
+
+        def category(self, *a, term=None, **kw):
+            if term is not None:
+                self._category = term
+            return self._category
+
+        def pubDate(self, val=None, *a, **kw):
+            if val is not None:
+                self._pub_date = val
+            return self._pub_date
 
     class FeedGenerator:
+        def __init__(self):
+            self._entries = []
+
         def id(self, *a, **kw): pass
         def title(self, *a, **kw): pass
         def link(self, *a, **kw): pass
@@ -137,10 +176,34 @@ def _make_feedgen_mock():
         def description(self, *a, **kw): pass
 
         def add_entry(self):
-            return FeedEntry()
+            entry = FeedEntry()
+            self._entries.append(entry)
+            return entry
 
         def rss_file(self, path, **kw):
-            pass
+            # Write a minimal valid RSS file so XML-parsing tests work
+            items_xml = ""
+            for e in self._entries:
+                guid_tag = f"<guid isPermaLink=\"{'true' if e._guid_permalink else 'false'}\">{e._guid or ''}</guid>"
+                cat_tag = f"<category>{e._category}</category>" if e._category else ""
+                items_xml += (
+                    f"<item>"
+                    f"<title>{e._title or 'No Title'}</title>"
+                    f"<link>{e._link or '#'}</link>"
+                    f"{guid_tag}"
+                    f"<description>{e._description or ''}</description>"
+                    f"{cat_tag}"
+                    f"</item>"
+                )
+            xml = (
+                "<?xml version='1.0' encoding='UTF-8'?>"
+                "<rss version=\"2.0\"><channel>"
+                "<title>ThreatWatch</title>"
+                f"{items_xml}"
+                "</channel></rss>"
+            )
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(xml)
 
     feed_mod.FeedGenerator = FeedGenerator
     mod.feed = feed_mod
@@ -151,17 +214,17 @@ def _make_feedgen_mock():
 if "anthropic" not in sys.modules:
     sys.modules["anthropic"] = _make_anthropic_mock()
 
-if "feedparser" not in sys.modules:
-    sys.modules["feedparser"] = _make_feedparser_mock()
-
-if "trafilatura" not in sys.modules:
-    sys.modules["trafilatura"] = _make_trafilatura_mock()
-
-if "lingua" not in sys.modules:
-    sys.modules["lingua"] = _make_lingua_mock()
-
-if "bs4" not in sys.modules:
-    sys.modules["bs4"] = _make_bs4_mock()
-
-if "feedgen" not in sys.modules:
-    sys.modules["feedgen"] = _make_feedgen_mock()
+_optional_mocks = [
+    ("feedparser", _make_feedparser_mock),
+    ("trafilatura", _make_trafilatura_mock),
+    ("lingua", _make_lingua_mock),
+    ("bs4", _make_bs4_mock),
+    ("feedgen", _make_feedgen_mock),
+]
+for _mod_name, _mock_factory in _optional_mocks:
+    try:
+        __import__(_mod_name)
+    except ImportError:
+        sys.modules[_mod_name] = _mock_factory()
+        if _mod_name == "feedgen":
+            sys.modules["feedgen.feed"] = sys.modules["feedgen"].feed

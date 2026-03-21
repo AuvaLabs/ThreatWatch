@@ -9,9 +9,15 @@ https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html
 import hashlib
 import json
 import logging
+import re
+
+logger = logging.getLogger(__name__)
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+# Strip characters that could break STIX pattern string literals
+_UNSAFE_STIX_RE = re.compile(r"['\\\[\]]")
 
 
 def _now_iso() -> str:
@@ -48,6 +54,13 @@ def _article_to_report(article: dict[str, Any]) -> dict[str, Any]:
     stix_id = _deterministic_id("report", url or title)
     identity_id = "identity--threatwatch-system"
 
+    # Map article confidence to STIX confidence (0-100)
+    confidence = article.get("confidence")
+    if isinstance(confidence, (int, float)):
+        confidence = max(0, min(100, int(confidence)))
+    else:
+        confidence = None
+
     report: dict[str, Any] = {
         "type": "report",
         "spec_version": "2.1",
@@ -67,6 +80,8 @@ def _article_to_report(article: dict[str, Any]) -> dict[str, Any]:
             }
         ] if url else [],
     }
+    if confidence is not None:
+        report["confidence"] = confidence
     return report
 
 
@@ -83,17 +98,18 @@ def _ioc_to_indicator(ioc: dict[str, Any]) -> dict[str, Any] | None:
     except Exception:
         ts = _now_iso()
 
-    # Map IOC type to STIX pattern
+    # Map IOC type to STIX pattern — sanitize value to prevent pattern injection
+    safe_value = _UNSAFE_STIX_RE.sub("", ioc_value)
     if ioc_type in ("md5_hash", "sha256_hash", "sha1_hash"):
         hash_type = ioc_type.upper().replace("_HASH", "")
-        pattern = f"[file:hashes.'{hash_type}' = '{ioc_value}']"
+        pattern = f"[file:hashes.'{hash_type}' = '{safe_value}']"
     elif ioc_type == "ip:port":
-        ip = ioc_value.split(":")[0]
+        ip = safe_value.split(":")[0]
         pattern = f"[network-traffic:dst_ref.type = 'ipv4-addr' AND network-traffic:dst_ref.value = '{ip}']"
     elif ioc_type == "domain":
-        pattern = f"[domain-name:value = '{ioc_value}']"
+        pattern = f"[domain-name:value = '{safe_value}']"
     elif ioc_type == "url":
-        pattern = f"[url:value = '{ioc_value}']"
+        pattern = f"[url:value = '{safe_value}']"
     else:
         return None  # unsupported IOC type
 
@@ -113,13 +129,28 @@ def _ioc_to_indicator(ioc: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _make_relationship(source_id: str, target_id: str, rel_type: str, ts: str) -> dict[str, Any]:
+    """Create a STIX 2.1 Relationship object."""
+    return {
+        "type": "relationship",
+        "spec_version": "2.1",
+        "id": _deterministic_id("relationship", f"{source_id}:{target_id}:{rel_type}"),
+        "created": ts,
+        "modified": ts,
+        "relationship_type": rel_type,
+        "source_ref": source_id,
+        "target_ref": target_id,
+    }
+
+
 def build_stix_bundle(articles: list[dict], ioc_items: list[dict] | None = None) -> dict:
     """Build a STIX 2.1 Bundle from ThreatWatch articles and IOC items."""
+    identity_id = "identity--threatwatch-system"
     objects: list[dict] = [
         {
             "type": "identity",
             "spec_version": "2.1",
-            "id": "identity--threatwatch-system",
+            "id": identity_id,
             "created": "2024-01-01T00:00:00Z",
             "modified": "2024-01-01T00:00:00Z",
             "name": "ThreatWatch",
@@ -128,21 +159,36 @@ def build_stix_bundle(articles: list[dict], ioc_items: list[dict] | None = None)
         }
     ]
 
+    report_ids: list[str] = []
     for article in articles:
         try:
-            objects.append(_article_to_report(article))
+            report = _article_to_report(article)
+            objects.append(report)
+            report_ids.append(report["id"])
         except Exception as e:
-            logging.debug("STIX: skipping article: %s", e)
+            logger.debug("STIX: skipping article: %s", e)
 
+    indicator_ids: list[str] = []
     for ioc in (ioc_items or []):
         try:
             indicator = _ioc_to_indicator(ioc)
             if indicator:
                 objects.append(indicator)
+                indicator_ids.append(indicator["id"])
         except Exception as e:
-            logging.debug("STIX: skipping IOC: %s", e)
+            logger.debug("STIX: skipping IOC: %s", e)
 
-    bundle_id = _deterministic_id("bundle", _now_iso())
+    # Link all indicators to the identity via "indicates" relationships
+    now = _now_iso()
+    for ind_id in indicator_ids:
+        objects.append(_make_relationship(ind_id, identity_id, "indicates", now))
+
+    # Update report object_refs to include indicator IDs
+    for obj in objects:
+        if obj.get("type") == "report" and indicator_ids:
+            obj["object_refs"] = [identity_id] + indicator_ids
+
+    bundle_id = _deterministic_id("bundle", now)
     return {
         "type": "bundle",
         "id": bundle_id,

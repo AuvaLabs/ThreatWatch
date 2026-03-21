@@ -10,6 +10,9 @@ import json
 import logging
 import re
 import hashlib
+from typing import Any
+
+logger = logging.getLogger(__name__)
 from datetime import datetime, timezone, timedelta
 
 import requests
@@ -55,7 +58,7 @@ ONION_SITES = [
 ]
 
 
-def _get_session():
+def _get_session() -> requests.Session:
     global _SESSION
     if _SESSION is None:
         _SESSION = requests.Session()
@@ -66,7 +69,7 @@ def _get_session():
     return _SESSION
 
 
-def _get_tor_session():
+def _get_tor_session() -> requests.Session | None:
     """Create a requests session routed through Tor SOCKS proxy."""
     global _TOR_SESSION
     if _TOR_SESSION is None:
@@ -80,12 +83,12 @@ def _get_tor_session():
                 "User-Agent": "Mozilla/5.0",
             })
         except Exception as e:
-            logging.warning(f"Tor session setup failed: {e}")
+            logger.warning(f"Tor session setup failed: {e}")
             return None
     return _TOR_SESSION
 
 
-def check_tor_available():
+def check_tor_available() -> bool:
     """Check if Tor SOCKS proxy is available."""
     try:
         session = _get_tor_session()
@@ -95,13 +98,13 @@ def check_tor_available():
         data = resp.json()
         is_tor = data.get("IsTor", False)
         if is_tor:
-            logging.info(f"Tor connected. Exit IP: {data.get('IP', 'unknown')}")
+            logger.info(f"Tor connected. Exit IP: {data.get('IP', 'unknown')}")
         return is_tor
     except Exception:
         return False
 
 
-def fetch_darkweb_intel():
+def fetch_darkweb_intel() -> list[dict[str, Any]]:
     """Fetch threat intel from all clearnet dark web aggregators.
 
     Returns list of articles in the same format as the main pipeline.
@@ -113,17 +116,17 @@ def fetch_darkweb_intel():
         try:
             articles = _fetch_source(source, cutoff)
             all_articles.extend(articles)
-            logging.info(
+            logger.info(
                 f"Dark web: {len(articles)} items from {source['name']}"
             )
         except Exception as e:
-            logging.warning(f"Dark web source {source['name']} failed: {e}")
+            logger.warning(f"Dark web source {source['name']} failed: {e}")
 
-    logging.info(f"Dark web monitoring: {len(all_articles)} total items")
+    logger.info(f"Dark web monitoring: {len(all_articles)} total items")
     return all_articles
 
 
-def _fetch_source(source, cutoff):
+def _fetch_source(source: dict[str, Any], cutoff: datetime) -> list[dict[str, Any]]:
     """Fetch and parse a single dark web source."""
     session = _get_session()
     resp = session.get(source["url"], timeout=15)
@@ -131,13 +134,13 @@ def _fetch_source(source, cutoff):
 
     parser = globals().get(source["parser"])
     if parser is None:
-        logging.warning(f"No parser for {source['name']}")
+        logger.warning(f"No parser for {source['name']}")
         return []
 
     return parser(resp, source, cutoff)
 
 
-def _parse_ransomware_live(resp, source, cutoff):
+def _parse_ransomware_live(resp: requests.Response, source: dict[str, Any], cutoff: datetime) -> list[dict[str, Any]]:
     """Parse ransomware.live recent victims API."""
     articles = []
     try:
@@ -183,12 +186,12 @@ def _parse_ransomware_live(resp, source, cutoff):
                 "darkweb_source": "ransomware.live",
             })
     except (json.JSONDecodeError, KeyError) as e:
-        logging.warning(f"ransomware.live parse error: {e}")
+        logger.warning(f"ransomware.live parse error: {e}")
 
     return articles
 
 
-def _parse_threatfox(resp, source, cutoff):
+def _parse_threatfox(resp: requests.Response, source: dict[str, Any], cutoff: datetime) -> list[dict[str, Any]]:
     """Parse ThreatFox recent IOCs from abuse.ch."""
     articles = []
     try:
@@ -251,12 +254,12 @@ def _parse_threatfox(resp, source, cutoff):
                 "darkweb_source": "threatfox",
             })
     except (json.JSONDecodeError, KeyError) as e:
-        logging.warning(f"ThreatFox parse error: {e}")
+        logger.warning(f"ThreatFox parse error: {e}")
 
     return articles
 
 
-def _parse_c2_tracker(resp, source, cutoff):
+def _parse_c2_tracker(resp: requests.Response, source: dict[str, Any], cutoff: datetime) -> list[dict[str, Any]]:
     """Parse C2-Tracker active C2 server list."""
     articles = []
     try:
@@ -288,12 +291,12 @@ def _parse_c2_tracker(resp, source, cutoff):
                 "darkweb_source": "c2-tracker",
             })
     except Exception as e:
-        logging.warning(f"C2-Tracker parse error: {e}")
+        logger.warning(f"C2-Tracker parse error: {e}")
 
     return articles
 
 
-def _parse_date(date_str):
+def _parse_date(date_str: str | None) -> datetime | None:
     """Try to parse various date formats."""
     if not date_str:
         return None
@@ -306,96 +309,80 @@ def _parse_date(date_str):
     return None
 
 
-def _country_to_region(country):
-    """Map country name or ISO-2 code to feed region.
+# ── Country/region lookup tables (module-level for efficiency) ────────────────
+_ISO2_TO_REGION = {
+    "us": "US", "ca": "US", "mx": "LATAM",
+    "gb": "Europe", "uk": "Europe", "de": "Europe", "fr": "Europe",
+    "it": "Europe", "es": "Europe", "nl": "Europe", "pl": "Europe",
+    "se": "Europe", "no": "Europe", "fi": "Europe", "dk": "Europe",
+    "ch": "Europe", "at": "Europe", "be": "Europe", "ie": "Europe",
+    "pt": "Europe", "cz": "Europe", "ro": "Europe", "hu": "Europe",
+    "gr": "Europe", "bg": "Europe", "hr": "Europe", "sk": "Europe",
+    "si": "Europe", "lt": "Europe", "lv": "Europe", "ee": "Europe",
+    "lu": "Europe", "cy": "Europe", "mt": "Europe", "al": "Europe",
+    "rs": "Europe", "ua": "Europe", "ba": "Europe", "me": "Europe",
+    "mk": "Europe", "md": "Europe", "by": "Europe", "za": "Europe",
+    "ng": "Europe", "ke": "Europe", "et": "Europe", "gh": "Europe",
+    "ae": "Middle East", "sa": "Middle East", "il": "Middle East",
+    "ir": "Middle East", "tr": "Middle East", "eg": "Middle East",
+    "qa": "Middle East", "kw": "Middle East", "bh": "Middle East",
+    "jo": "Middle East", "iq": "Middle East", "lb": "Middle East",
+    "om": "Middle East", "ye": "Middle East", "sy": "Middle East",
+    "ps": "Middle East", "ly": "Middle East", "ma": "Middle East",
+    "tn": "Middle East", "dz": "Middle East",
+    "jp": "APAC", "au": "APAC", "in": "APAC", "sg": "APAC",
+    "kr": "APAC", "cn": "APAC", "tw": "APAC", "id": "APAC",
+    "my": "APAC", "th": "APAC", "vn": "APAC", "ph": "APAC",
+    "nz": "APAC", "hk": "APAC", "pk": "APAC", "bd": "APAC",
+    "lk": "APAC", "mm": "APAC", "kh": "APAC", "np": "APAC",
+    "br": "LATAM", "ar": "LATAM", "co": "LATAM", "cl": "LATAM",
+    "pe": "LATAM", "ec": "LATAM", "ve": "LATAM", "py": "LATAM",
+    "uy": "LATAM", "bo": "LATAM", "cr": "LATAM", "pa": "LATAM",
+    "gt": "LATAM", "hn": "LATAM", "sv": "LATAM", "ni": "LATAM",
+    "do": "LATAM", "cu": "LATAM", "pr": "LATAM",
+}
 
-    Handles both full country names (e.g. "Germany") and ISO 3166-1 alpha-2
-    codes as returned by ransomware.live (e.g. "DE", "FR", "GB").
-    """
+_NAME_TO_REGION = {}
+for _name in ("usa", "united states", "canada"):
+    _NAME_TO_REGION[_name] = "US"
+for _name in (
+    "united kingdom", "germany", "france", "italy", "spain",
+    "netherlands", "poland", "sweden", "norway", "finland", "denmark",
+    "switzerland", "austria", "belgium", "ireland", "portugal",
+    "czech republic", "romania", "hungary", "greece", "bulgaria",
+    "croatia", "slovakia", "slovenia", "serbia", "ukraine", "belarus",
+    "south africa", "nigeria", "kenya", "ethiopia", "ghana",
+    "russia", "russian federation",
+):
+    _NAME_TO_REGION[_name] = "Europe"
+for _name in (
+    "uae", "united arab emirates", "saudi arabia", "israel", "iran",
+    "turkey", "egypt", "qatar", "kuwait", "bahrain", "jordan", "iraq",
+    "lebanon", "oman", "yemen", "syria", "libya", "morocco",
+    "tunisia", "algeria",
+):
+    _NAME_TO_REGION[_name] = "Middle East"
+for _name in (
+    "japan", "australia", "india", "singapore", "south korea", "china",
+    "taiwan", "indonesia", "malaysia", "thailand", "vietnam", "philippines",
+    "new zealand", "hong kong", "pakistan", "bangladesh", "sri lanka",
+    "myanmar", "cambodia", "nepal",
+):
+    _NAME_TO_REGION[_name] = "APAC"
+for _name in (
+    "brazil", "argentina", "colombia", "chile", "peru", "mexico",
+    "ecuador", "venezuela", "paraguay", "uruguay", "bolivia",
+    "costa rica", "panama", "guatemala", "honduras", "el salvador",
+    "nicaragua", "dominican republic", "cuba", "puerto rico",
+):
+    _NAME_TO_REGION[_name] = "LATAM"
+
+
+def _country_to_region(country: str) -> str:
+    """Map country name or ISO-2 code to feed region."""
     if not country:
         return "Global"
-
-    country_lower = country.lower().strip()
-
-    # ISO 2-letter code → region
-    _ISO2 = {
-        # North America
-        "us": "US", "ca": "US", "mx": "LATAM",
-        # Europe / EMEA
-        "gb": "Europe", "uk": "Europe", "de": "Europe", "fr": "Europe",
-        "it": "Europe", "es": "Europe", "nl": "Europe", "pl": "Europe",
-        "se": "Europe", "no": "Europe", "fi": "Europe", "dk": "Europe",
-        "ch": "Europe", "at": "Europe", "be": "Europe", "ie": "Europe",
-        "pt": "Europe", "cz": "Europe", "ro": "Europe", "hu": "Europe",
-        "gr": "Europe", "bg": "Europe", "hr": "Europe", "sk": "Europe",
-        "si": "Europe", "lt": "Europe", "lv": "Europe", "ee": "Europe",
-        "lu": "Europe", "cy": "Europe", "mt": "Europe", "al": "Europe",
-        "rs": "Europe", "ua": "Europe", "ba": "Europe", "me": "Europe",
-        "mk": "Europe", "md": "Europe", "by": "Europe", "za": "Europe",
-        "ng": "Europe", "ke": "Europe", "et": "Europe", "gh": "Europe",
-        # Middle East / North Africa
-        "ae": "Middle East", "sa": "Middle East", "il": "Middle East",
-        "ir": "Middle East", "tr": "Middle East", "eg": "Middle East",
-        "qa": "Middle East", "kw": "Middle East", "bh": "Middle East",
-        "jo": "Middle East", "iq": "Middle East", "lb": "Middle East",
-        "om": "Middle East", "ye": "Middle East", "sy": "Middle East",
-        "ps": "Middle East", "ly": "Middle East", "ma": "Middle East",
-        "tn": "Middle East", "dz": "Middle East",
-        # APAC
-        "jp": "APAC", "au": "APAC", "in": "APAC", "sg": "APAC",
-        "kr": "APAC", "cn": "APAC", "tw": "APAC", "id": "APAC",
-        "my": "APAC", "th": "APAC", "vn": "APAC", "ph": "APAC",
-        "nz": "APAC", "hk": "APAC", "pk": "APAC", "bd": "APAC",
-        "lk": "APAC", "mm": "APAC", "kh": "APAC", "np": "APAC",
-        # LATAM
-        "br": "LATAM", "ar": "LATAM", "co": "LATAM", "cl": "LATAM",
-        "pe": "LATAM", "ec": "LATAM", "ve": "LATAM", "py": "LATAM",
-        "uy": "LATAM", "bo": "LATAM", "cr": "LATAM", "pa": "LATAM",
-        "gt": "LATAM", "hn": "LATAM", "sv": "LATAM", "ni": "LATAM",
-        "do": "LATAM", "cu": "LATAM", "pr": "LATAM",
-    }
-
-    if len(country_lower) == 2 and country_lower in _ISO2:
-        return _ISO2[country_lower]
-
-    # Full country name → region
-    _NA = {"usa", "united states", "canada"}
-    _EMEA = {
-        "united kingdom", "germany", "france", "italy", "spain",
-        "netherlands", "poland", "sweden", "norway", "finland", "denmark",
-        "switzerland", "austria", "belgium", "ireland", "portugal",
-        "czech republic", "romania", "hungary", "greece", "bulgaria",
-        "croatia", "slovakia", "slovenia", "serbia", "ukraine", "belarus",
-        "south africa", "nigeria", "kenya", "ethiopia", "ghana",
-        "russia", "russian federation",
-    }
-    _MENA = {
-        "uae", "united arab emirates", "saudi arabia", "israel", "iran",
-        "turkey", "egypt", "qatar", "kuwait", "bahrain", "jordan", "iraq",
-        "lebanon", "oman", "yemen", "syria", "libya", "morocco",
-        "tunisia", "algeria",
-    }
-    _APAC = {
-        "japan", "australia", "india", "singapore", "south korea", "china",
-        "taiwan", "indonesia", "malaysia", "thailand", "vietnam", "philippines",
-        "new zealand", "hong kong", "pakistan", "bangladesh", "sri lanka",
-        "myanmar", "cambodia", "nepal",
-    }
-    _LATAM = {
-        "brazil", "argentina", "colombia", "chile", "peru", "mexico",
-        "ecuador", "venezuela", "paraguay", "uruguay", "bolivia",
-        "costa rica", "panama", "guatemala", "honduras", "el salvador",
-        "nicaragua", "dominican republic", "cuba", "puerto rico",
-    }
-
-    if country_lower in _NA:
-        return "US"
-    if country_lower in _EMEA:
-        return "Europe"
-    if country_lower in _MENA:
-        return "Middle East"
-    if country_lower in _APAC:
-        return "APAC"
-    if country_lower in _LATAM:
-        return "LATAM"
-    return "Global"
+    key = country.lower().strip()
+    if len(key) == 2:
+        return _ISO2_TO_REGION.get(key, "Global")
+    return _NAME_TO_REGION.get(key, "Global")

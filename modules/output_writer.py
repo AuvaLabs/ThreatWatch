@@ -1,6 +1,8 @@
 import json
 import logging
 from datetime import datetime, timedelta, timezone
+
+logger = logging.getLogger(__name__)
 from email.utils import format_datetime
 from pathlib import Path
 
@@ -23,7 +25,7 @@ def _write_json(data, path):
     _ensure_dir(path.parent)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
-    logging.info(f"Saved JSON to {path} ({len(data)} articles)")
+    logger.info(f"Saved JSON to {path} ({len(data)} articles)")
 
 
 def _load_existing(path):
@@ -77,7 +79,7 @@ def _merge_articles(existing, new_articles):
         reverse=True,
     )
 
-    logging.info(
+    logger.info(
         f"Merged: {len(new_articles)} new + {len(existing)} existing "
         f"= {len(filtered)} total (after dedup + cutoff)"
     )
@@ -128,8 +130,9 @@ def _parse_pub_date(date_str):
 def write_rss_output(articles):
     fg = FeedGenerator()
     fg.id(f"{SITE_URL}/threatdigest")
-    fg.title("ThreatDigest Hub - Curated Cyber Incidents")
-    fg.link(href=SITE_URL, rel="self")
+    fg.title("ThreatWatch - Curated Cyber Threat Intelligence")
+    fg.link(href=SITE_URL, rel="alternate")
+    fg.link(href=f"{SITE_URL}/api/rss", rel="self")
     fg.language("en")
     fg.description(
         "A curated list of recent cyber incidents, attacks, and security threats."
@@ -138,11 +141,18 @@ def write_rss_output(articles):
     for article in articles:
         fe = fg.add_entry()
         fe.title(article.get("title", "No Title"))
-        fe.link(href=article.get("link", "#"))
+        link = article.get("link", "#")
+        fe.link(href=link)
 
-        summary_text = article.get("summary", "")
-        if not summary_text:
-            summary_text = article.get("summary", "No summary available.")
+        # Use link as guid (permalink) for reliable deduplication by RSS readers
+        fe.guid(link, permalink=True)
+
+        # Add category if present
+        category = article.get("category")
+        if category:
+            fe.category(term=category)
+
+        summary_text = article.get("summary") or "No summary available."
         fe.description(summary_text)
 
         pub_date = _parse_pub_date(
@@ -152,4 +162,4 @@ def write_rss_output(articles):
 
     _ensure_dir(RSS_PATH.parent)
     fg.rss_file(str(RSS_PATH))
-    logging.info(f"RSS feed saved to {RSS_PATH}")
+    logger.info(f"RSS feed saved to {RSS_PATH}")

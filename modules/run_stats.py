@@ -3,6 +3,8 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 from modules.config import OUTPUT_DIR
 from modules.cost_tracker import get_today_spend, get_total_spend
 
@@ -53,7 +55,7 @@ class RunStats:
             pass
 
         if self.budget_exceeded:
-            logging.warning(
+            logger.warning(
                 "AI budget was exceeded this run — some articles used keyword classification only."
             )
 
@@ -82,7 +84,7 @@ class RunStats:
         stats["latest"] = run
         _save_stats(stats)
 
-        logging.info(
+        logger.info(
             f"Run stats: {self.articles_fetched} fetched, "
             f"{self.news_reviewed} news reviewed, "
             f"{self.cyber_articles} cyber articles, "

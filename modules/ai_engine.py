@@ -3,6 +3,9 @@ import re
 import logging
 import hashlib
 import time
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 import httpx
 import anthropic
@@ -29,7 +32,7 @@ SAFE_DEFAULT = {
 }
 
 
-def _get_client():
+def _get_client() -> anthropic.Anthropic:
     global _client
     if _client is None:
         _client = anthropic.Anthropic(
@@ -40,21 +43,10 @@ def _get_client():
     return _client
 
 
-def _extract_json(text):
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
-    match = re.search(r"\{[^{}]*\}", text, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group())
-        except json.JSONDecodeError:
-            pass
-    return None
+from modules.utils import extract_json as _extract_json
 
 
-def analyze_article(title, content=None, source_language="en"):
+def analyze_article(title: str, content: str | None = None, source_language: str = "en") -> dict[str, Any]:
     try:
         cache_key = None
         if content:
@@ -75,7 +67,7 @@ def analyze_article(title, content=None, source_language="en"):
         if not check_daily_budget():
             global _budget_skip_count
             _budget_skip_count += 1
-            logging.warning(f"Budget limit reached, skipping: {title}")
+            logger.warning(f"Budget limit reached, skipping: {title}")
             return {**SAFE_DEFAULT, "translated_title": title, "_budget_skipped": True}
 
         client = _get_client()
@@ -97,7 +89,7 @@ def analyze_article(title, content=None, source_language="en"):
                 )
                 break
             except (anthropic.APIConnectionError, anthropic.APITimeoutError, anthropic.InternalServerError) as e:
-                logging.warning(f"API attempt {attempt + 1}/3 failed for '{title[:50]}': {e}")
+                logger.warning(f"API attempt {attempt + 1}/3 failed for '{title[:50]}': {e}")
                 if attempt < 2:
                     time.sleep(2 ** (attempt + 1))
                     continue
@@ -108,7 +100,7 @@ def analyze_article(title, content=None, source_language="en"):
         result = _extract_json(reply_text)
 
         if result is None:
-            logging.warning(f"Failed to parse AI response for: {title}")
+            logger.warning(f"Failed to parse AI response for: {title}")
             return {**SAFE_DEFAULT, "translated_title": title}
 
         for key in SAFE_DEFAULT:
@@ -124,20 +116,20 @@ def analyze_article(title, content=None, source_language="en"):
     except anthropic.APIError as e:
         global _failure_count
         _failure_count += 1
-        logging.error(f"Anthropic API error for '{title}': {e}")
+        logger.error(f"Anthropic API error for '{title}': {e}")
         return {**SAFE_DEFAULT, "translated_title": title, "ai_analysis_failed": True}
     except Exception as e:
         _failure_count += 1
-        logging.error(f"Unexpected error analyzing '{title}': {e}")
+        logger.error(f"Unexpected error analyzing '{title}': {e}")
         return {**SAFE_DEFAULT, "translated_title": title, "ai_analysis_failed": True}
 
 
-def get_failure_stats():
+def get_failure_stats() -> dict[str, int]:
     return {
         "failures": _failure_count,
         "budget_skips": _budget_skip_count,
     }
 
 
-def compute_content_hash(content):
+def compute_content_hash(content: str) -> str:
     return hashlib.sha256(content[:MAX_CONTENT_CHARS].encode()).hexdigest()

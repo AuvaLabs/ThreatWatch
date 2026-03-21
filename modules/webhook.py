@@ -13,6 +13,8 @@ import logging
 import os
 from datetime import datetime, timezone
 
+logger = logging.getLogger(__name__)
+
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -91,7 +93,7 @@ def dispatch(articles: list[dict]) -> None:
         if a.get("is_cyber_attack") and (a.get("confidence") or 0) >= WEBHOOK_MIN_CONF
     ]
     if not high_conf:
-        logging.debug("Webhook: no high-confidence articles to report")
+        logger.debug("Webhook: no high-confidence articles to report")
         return
 
     payload = _format_slack(high_conf) if _is_slack_url(WEBHOOK_URL) else _format_generic(high_conf)
@@ -104,7 +106,7 @@ def dispatch(articles: list[dict]) -> None:
             headers={"Content-Type": "application/json"},
         )
         resp.raise_for_status()
-        logging.info("Webhook dispatched: %d articles → %s (HTTP %d)",
+        logger.info("Webhook dispatched: %d articles → %s (HTTP %d)",
                      len(high_conf), WEBHOOK_URL[:40] + "…", resp.status_code)
     except requests.RequestException as e:
-        logging.warning("Webhook delivery failed: %s", e)
+        logger.warning("Webhook delivery failed: %s", e)

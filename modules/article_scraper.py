@@ -3,6 +3,9 @@ import random
 import logging
 import requests
 import trafilatura
+from typing import Any
+
+logger = logging.getLogger(__name__)
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from requests.adapters import HTTPAdapter
@@ -20,7 +23,7 @@ USER_AGENTS = [
 ]
 
 
-def _create_session():
+def _create_session() -> requests.Session:
     session = requests.Session()
     retry_strategy = Retry(
         total=3,
@@ -41,13 +44,13 @@ def _create_session():
 _session = _create_session()
 
 
-def _get_headers():
+def _get_headers() -> dict[str, str]:
     return {"User-Agent": random.choice(USER_AGENTS)}
 
 
-def extract_with_trafilatura(url):
+def extract_with_trafilatura(url: str) -> str | None:
     if not is_safe_url(url):
-        logging.debug(f"extract_with_trafilatura: blocked unsafe URL {url}")
+        logger.debug(f"extract_with_trafilatura: blocked unsafe URL {url}")
         return None
     try:
         downloaded = trafilatura.fetch_url(url)
@@ -56,13 +59,13 @@ def extract_with_trafilatura(url):
         text = trafilatura.extract(downloaded, include_comments=False, include_tables=False)
         return text if text and len(text) > 100 else None
     except Exception as e:
-        logging.warning(f"trafilatura failed for {url}: {e}")
+        logger.warning(f"trafilatura failed for {url}: {e}")
         return None
 
 
-def extract_with_fallback(url):
+def extract_with_fallback(url: str) -> str | None:
     if not is_safe_url(url):
-        logging.debug(f"extract_with_fallback: blocked unsafe URL {url}")
+        logger.debug(f"extract_with_fallback: blocked unsafe URL {url}")
         return None
     try:
         response = _session.get(url, headers=_get_headers(), timeout=10)
@@ -77,28 +80,28 @@ def extract_with_fallback(url):
         content = " ".join(p.get_text(strip=True) for p in paragraphs if len(p.get_text(strip=True)) > 20)
         return content.strip() if len(content) > 100 else None
     except requests.RequestException as e:
-        logging.warning(f"Fallback scraping failed for {url}: {e}")
+        logger.warning(f"Fallback scraping failed for {url}: {e}")
         return None
 
 
-def extract_article_content(raw_url):
+def extract_article_content(raw_url: str) -> tuple[str, str | None]:
     clean_url = resolve_original_url(raw_url)
 
     content = extract_with_trafilatura(clean_url)
     if content:
-        logging.info(f"Extracted {len(content)} chars from {clean_url}")
+        logger.info(f"Extracted {len(content)} chars from {clean_url}")
         return clean_url, content
 
     content = extract_with_fallback(clean_url)
     if content:
-        logging.info(f"Extracted {len(content)} chars (fallback) from {clean_url}")
+        logger.info(f"Extracted {len(content)} chars (fallback) from {clean_url}")
         return clean_url, content
 
-    logging.warning(f"No content extracted from {clean_url}")
+    logger.warning(f"No content extracted from {clean_url}")
     return clean_url, None
 
 
-def process_urls_in_parallel(url_list, max_threads=MAX_SCRAPER_THREADS):
+def process_urls_in_parallel(url_list: list[str], max_threads: int = MAX_SCRAPER_THREADS) -> dict[str, str | None]:
     results = {}
     unique_urls = list(dict.fromkeys(url_list))
 
@@ -115,10 +118,10 @@ def process_urls_in_parallel(url_list, max_threads=MAX_SCRAPER_THREADS):
                 if clean_url != url:
                     results[clean_url] = content
             except Exception as exc:
-                logging.error(f"Exception scraping {url}: {exc}")
+                logger.error(f"Exception scraping {url}: {exc}")
                 results[url] = None
 
-    logging.info(
+    logger.info(
         f"Scraping complete: {sum(1 for v in results.values() if v)} of "
         f"{len(unique_urls)} articles extracted"
     )

@@ -2,6 +2,9 @@ import hashlib
 import logging
 import re
 import string
+from typing import Any
+
+logger = logging.getLogger(__name__)
 from pathlib import Path
 
 from modules.config import (
@@ -33,7 +36,7 @@ _STOP_WORDS = frozenset({
 })
 
 
-def normalize_title(title):
+def normalize_title(title: str) -> str:
     text = title.lower().strip()
     for prefix in _PREFIXES:
         if text.startswith(prefix):
@@ -42,7 +45,7 @@ def normalize_title(title):
     return " ".join(text.split())
 
 
-def _make_word_shingles(normalized):
+def _make_word_shingles(normalized: str) -> frozenset[str]:
     """Create word unigram + bigram shingles for robust fuzzy matching."""
     words = [w for w in normalized.split() if w not in _STOP_WORDS]
     if not words:
@@ -53,7 +56,7 @@ def _make_word_shingles(normalized):
     return frozenset(shingles)
 
 
-def _word_overlap_ratio(set_a, set_b):
+def _word_overlap_ratio(set_a: frozenset[str], set_b: frozenset[str]) -> float:
     """Compute overlap ratio: |intersection| / min(|a|, |b|)."""
     if not set_a or not set_b:
         return 0.0
@@ -72,7 +75,7 @@ class ShingleIndex:
         self._raw_titles = []      # original (pre-normalize) for CVE extraction
         self._word_counts = []     # meaningful word count (post-stop-word) for each entry
 
-    def add(self, normalized_title, raw_title=None):
+    def add(self, normalized_title: str, raw_title: str | None = None) -> int:
         idx = len(self._normalized_titles)
         shingles = _make_word_shingles(normalized_title)
         word_count = len([w for w in normalized_title.split() if w not in _STOP_WORDS])
@@ -86,11 +89,11 @@ class ShingleIndex:
             self._shingle_to_indices[s].append(idx)
         return idx
 
-    def _incoming_word_count(self, normalized_title):
+    def _incoming_word_count(self, normalized_title: str) -> int:
         return len([w for w in normalized_title.split() if w not in _STOP_WORDS])
 
-    def is_fuzzy_duplicate(self, normalized_title, raw_title=None,
-                           threshold=FUZZY_DEDUP_THRESHOLD):
+    def is_fuzzy_duplicate(self, normalized_title: str, raw_title: str | None = None,
+                           threshold: float = FUZZY_DEDUP_THRESHOLD) -> bool:
         shingles = _make_word_shingles(normalized_title)
 
         # Too few meaningful words in the incoming title — exact match only
@@ -128,15 +131,15 @@ class ShingleIndex:
 
             similarity = _word_overlap_ratio(shingles, self._title_shingles[idx])
             if similarity >= threshold:
-                logging.info(
+                logger.info(
                     f"Fuzzy duplicate ({similarity:.2f}): "
                     f"'{normalized_title}' ~ '{existing}'"
                 )
                 return True
         return False
 
-    def find_best_match_index(self, normalized_title, start_idx, raw_title=None,
-                              threshold=FUZZY_DEDUP_THRESHOLD):
+    def find_best_match_index(self, normalized_title: str, start_idx: int, raw_title: str | None = None,
+                              threshold: float = FUZZY_DEDUP_THRESHOLD) -> int:
         shingles = _make_word_shingles(normalized_title)
         if self._incoming_word_count(normalized_title) < _MIN_FUZZY_WORDS:
             return -1
@@ -179,14 +182,14 @@ class ShingleIndex:
         return len(self._normalized_titles)
 
 
-def _load_lines(filepath):
+def _load_lines(filepath: Path) -> list[str]:
     if not filepath.exists():
         return []
     with open(filepath, "r", encoding="utf-8") as f:
         return [line.strip() for line in f if line.strip()]
 
 
-def _save_lines(filepath, lines, max_lines=None):
+def _save_lines(filepath: Path, lines: list[str], max_lines: int | None = None) -> None:
     filepath.parent.mkdir(parents=True, exist_ok=True)
     if max_lines and len(lines) > max_lines:
         lines = lines[-max_lines:]
@@ -195,7 +198,7 @@ def _save_lines(filepath, lines, max_lines=None):
             f.write(f"{line}\n")
 
 
-def deduplicate_articles(articles):
+def deduplicate_articles(articles: list[dict[str, Any]]) -> list[dict[str, Any]]:
     # Load hashes as ordered list (preserves insertion order for correct LRU eviction)
     # and also as a set for O(1) lookup.
     seen_hashes_ordered = _load_lines(SEEN_HASHES_FILE)
@@ -227,7 +230,7 @@ def deduplicate_articles(articles):
             # Merge region from duplicate into existing article in this batch
             if raw_hash in hash_to_idx:
                 _merge_region(unique_articles[hash_to_idx[raw_hash]], article)
-            logging.debug(f"Hash duplicate skipped: {article['link']}")
+            logger.debug(f"Hash duplicate skipped: {article['link']}")
             continue
 
         raw_title = article["title"]
@@ -236,7 +239,7 @@ def deduplicate_articles(articles):
         # Skip fuzzy dedup for dark web articles (structured titles with shared words)
         is_darkweb = article.get("darkweb", False)
         if not is_darkweb and index.is_fuzzy_duplicate(normalized, raw_title=raw_title):
-            logging.info(f"Fuzzy duplicate skipped: {raw_title}")
+            logger.info(f"Fuzzy duplicate skipped: {raw_title}")
             _add_related(unique_articles, article, index, normalized,
                          raw_title, batch_start_idx)
             seen_hashes.add(raw_hash)
@@ -258,7 +261,7 @@ def deduplicate_articles(articles):
     all_titles = seen_titles + new_titles
     _save_lines(SEEN_TITLES_FILE, all_titles, max_lines=MAX_SEEN_TITLES)
 
-    logging.info(
+    logger.info(
         f"Deduplication: {len(articles)} input -> {len(unique_articles)} unique "
         f"({len(articles)} news reviewed)"
     )
@@ -278,7 +281,7 @@ def _collapse_regions(regions: set) -> str:
     return ",".join(sorted(regions))
 
 
-def _merge_region(original, duplicate):
+def _merge_region(original: dict[str, Any], duplicate: dict[str, Any]) -> None:
     """Merge feed_region from duplicate into the original article."""
     orig_region = original.get("feed_region", "Global")
     dup_region = duplicate.get("feed_region", "Global")
@@ -288,8 +291,8 @@ def _merge_region(original, duplicate):
         original["feed_region"] = _collapse_regions(existing)
 
 
-def _add_related(unique_articles, duplicate_article, index, dup_normalized,
-                 dup_raw_title, batch_start_idx):
+def _add_related(unique_articles: list[dict[str, Any]], duplicate_article: dict[str, Any], index: ShingleIndex, dup_normalized: str,
+                 dup_raw_title: str, batch_start_idx: int) -> None:
     match_offset = index.find_best_match_index(
         dup_normalized, batch_start_idx, raw_title=dup_raw_title
     )

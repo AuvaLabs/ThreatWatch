@@ -2,6 +2,8 @@ import json
 import logging
 import threading
 from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 from pathlib import Path
 
 from modules.config import STATE_DIR, DAILY_BUDGET_USD
@@ -93,7 +95,7 @@ def track_usage(response):
 
         _save_costs(data)
 
-    logging.debug(
+    logger.debug(
         f"API cost: ${cost:.4f} (in:{inp} out:{out} "
         f"cache_r:{cache_r} cache_w:{cache_w})"
     )
@@ -107,7 +109,7 @@ def check_daily_budget():
     spent = day_data.get("cost_usd", 0.0)
 
     if spent >= DAILY_BUDGET_USD:
-        logging.warning(
+        logger.warning(
             f"Daily budget exceeded: ${spent:.2f} >= ${DAILY_BUDGET_USD:.2f}. "
             f"Skipping API calls."
         )

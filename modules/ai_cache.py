@@ -4,6 +4,8 @@ import logging
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 from modules.config import STATE_DIR
 
 CACHE_DIR = STATE_DIR / "ai_cache"
@@ -20,10 +22,10 @@ def get_cached_result(content_hash):
     try:
         with open(path, "r", encoding="utf-8") as f:
             entry = json.load(f)
-        logging.info(f"Cache hit for {content_hash[:12]}...")
+        logger.info(f"Cache hit for {content_hash[:12]}...")
         return entry.get("result")
     except (json.JSONDecodeError, KeyError) as e:
-        logging.warning(f"Corrupt cache entry {content_hash[:12]}: {e}")
+        logger.warning(f"Corrupt cache entry {content_hash[:12]}: {e}")
         path.unlink(missing_ok=True)
         return None
 
@@ -40,7 +42,7 @@ def cache_result(content_hash, result):
             fcntl.flock(f, fcntl.LOCK_EX)
             json.dump(entry, f, ensure_ascii=False)
     except Exception as e:
-        logging.error(f"Failed to cache result for {content_hash[:12]}: {e}")
+        logger.error(f"Failed to cache result for {content_hash[:12]}: {e}")
 
 
 def clear_old_cache(max_age_days=30):
@@ -61,4 +63,4 @@ def clear_old_cache(max_age_days=30):
             cleared += 1
 
     if cleared:
-        logging.info(f"Cleared {cleared} expired cache entries.")
+        logger.info(f"Cleared {cleared} expired cache entries.")

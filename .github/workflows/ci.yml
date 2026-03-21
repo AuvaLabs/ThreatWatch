@@ -41,7 +41,7 @@ jobs:
             --cov=modules \
             --cov=serve_threatwatch \
             --cov-report=term-missing \
-            --cov-fail-under=65 \
+            --cov-fail-under=75 \
             -v
 
   audit:
