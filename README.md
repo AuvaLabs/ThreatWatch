@@ -2,18 +2,19 @@
 
 # ThreatWatch
 
-**Zero-cost, self-hosted cyber threat intelligence platform**
+**AI-powered cyber threat intelligence platform — zero cost**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: Non-Commercial](https://img.shields.io/badge/license-Non--Commercial-orange.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
 [![Zero Cost](https://img.shields.io/badge/cost-%240%2Fmonth-brightgreen)]()
+[![AI Powered](https://img.shields.io/badge/AI-intelligence--briefing-8B5CF6?logo=openai&logoColor=white)]()
 [![Feeds](https://img.shields.io/badge/feeds-155+-blue)]()
 [![GitHub Stars](https://img.shields.io/github/stars/AuvaLabs/threatwatch?style=social)](https://github.com/AuvaLabs/threatwatch)
 
 **[Live Demo](https://threatwatch.auvalabs.com)** · **[GitHub Pages](https://auvalabs.github.io/threatwatch/)**
 
-Aggregates threat intelligence from 155+ RSS feeds, dark web sources, and NewsAPI — classifies by category and region, deduplicates, and serves a live single-page dashboard. Runs on your own infrastructure. No API keys required.
+AI-powered threat intelligence platform that aggregates 155+ RSS feeds, dark web sources, and NewsAPI — classifies, deduplicates, and generates analyst-grade intelligence briefings with confidence-rated findings, threat forecasts, and actionable priority recommendations. Runs entirely free using Groq's API free tier. Self-hosted, zero-cost infrastructure.
 
 [Features](#features) · [Quick start](#quick-start) · [Configuration](#configuration) · [Architecture](#architecture) · [API](#api-endpoints) · [Contributing](#contributing)
 
@@ -53,7 +54,7 @@ Aggregates threat intelligence from 155+ RSS feeds, dark web sources, and NewsAP
 ### Dashboard
 - Server-side rendered, **loads in under a second**
 - **Single HTML file** — no build step, no framework, no JavaScript bundle; IBM Plex Mono + Space Grotesk typography
-- **Category tabs**: Briefing, Ransomware, APT, Breach, DDoS, Phishing, Malware, Zero-Day, Vuln, Dark Web, Brands, Tech
+- **Category tabs**: Intel Brief, Ransomware, APT, Breach, DDoS, Phishing, Malware, Zero-Day, Vuln, Dark Web, Brands, Tech
 - Category tabs filter the left-panel live feed — one click to see all matching articles
 - **Brand Watch tab** — monitor specific brands/organisations; selecting a brand filters the left panel
 - **Tech Watch tab** — 244 technology vendors across 18 categories; selecting a vendor filters the left panel
@@ -63,8 +64,8 @@ Aggregates threat intelligence from 155+ RSS feeds, dark web sources, and NewsAP
 - Key incidents panel, threat actor spotlight, sector impact panels with drilldown
 - Article detail view with IOC extraction (CVEs, IPs, hashes, domains)
 - Watchlist preferences saved to localStorage; self-hosted installs can persist keywords server-side
-- Auto-generated threat intelligence briefing (zero cost)
-- Optional AI-powered briefing (any LLM provider — toggle in UI)
+- **AI intelligence briefing** — analyst-grade assessments with confidence-rated findings, threat forecasts, sector impact analysis, and priority actions tied to specific observed threats (any LLM provider — Groq free tier recommended)
+- Auto-generated statistical briefing as fallback (zero cost, no API key needed)
 - **5 switchable themes** — Nightwatch (dark brass), Parchment (light cream), Solarized, Arctic (clean blue), Phosphor (retro CRT)
 - Both live URLs displayed in the page footer
 
@@ -145,9 +146,9 @@ Sign up at [newsapi.org](https://newsapi.org) for a free API key (100 requests/d
 | `NEWSAPI_KEY` | _(empty)_ | newsapi.org API key |
 | `NEWSAPI_INTERVAL` | `1800` | Seconds between NewsAPI calls (default 30 min) |
 
-### Optional: AI-powered briefing
+### Optional: AI intelligence briefing
 
-ThreatWatch works without any API keys. To enable AI-powered briefings, configure any OpenAI-compatible LLM provider:
+ThreatWatch works without any API keys. To enable AI-powered intelligence briefings with confidence-rated findings and threat forecasts, configure any OpenAI-compatible LLM provider:
 
 | Variable | Default | Description |
 |---|---|---|
@@ -156,7 +157,16 @@ ThreatWatch works without any API keys. To enable AI-powered briefings, configur
 | `LLM_MODEL` | `gpt-4o-mini` | Model name |
 | `LLM_PROVIDER` | `auto` | `auto`, `openai`, `anthropic`, `ollama` |
 
-Works with OpenAI, Groq, Together, Ollama (free/local), Mistral, DeepSeek, and any OpenAI-compatible API.
+**Recommended free setup** — [Groq](https://console.groq.com) provides free API access:
+
+```env
+LLM_API_KEY=gsk_your_key_here
+LLM_BASE_URL=https://api.groq.com/openai/v1
+LLM_MODEL=llama-3.3-70b-versatile
+LLM_PROVIDER=openai
+```
+
+Also works with OpenAI, Together, Ollama (local), Mistral, DeepSeek, and any OpenAI-compatible API. Rate-limited to 1 API call per hour.
 
 ### Feed configuration
 
@@ -229,7 +239,7 @@ The server runs on port **8098** by default:
 | `GET` | `/` | Dashboard (server-side rendered HTML) |
 | `GET` | `/api/articles` | All articles as JSON array |
 | `GET` | `/api/articles?offset=0&limit=20` | Paginated articles |
-| `GET` | `/api/briefing` | Threat intelligence briefing |
+| `GET` | `/api/briefing` | AI intelligence briefing |
 | `GET` | `/api/stats` | Pipeline run statistics |
 | `GET` | `/api/health` | Server health + feed status |
 | `GET` | `/api/stix` | STIX 2.1 bundle export |
