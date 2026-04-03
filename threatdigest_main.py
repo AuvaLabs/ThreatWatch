@@ -225,20 +225,20 @@ def main():
         # Tier 3: Article summaries (up to 30/run, ~3K tokens per batch)
         summarize_articles(enriched_articles)
     except Exception as e:
-        logging.debug(f"AI enrichment skipped: {e}")
+        logging.warning(f"AI enrichment skipped: {e}")
 
-    # Incident clustering + actor profiles (separate try to not block on failures)
+    # Incident clustering + actor profiles run on FULL corpus (not just new batch)
     try:
-        from modules.incident_correlator import cluster_articles
-        cluster_articles(enriched_articles)
-    except Exception as e:
-        logging.debug(f"Incident clustering skipped: {e}")
+        from modules.output_writer import _load_existing, STATIC_DAILY
+        all_articles = _load_existing(STATIC_DAILY)
+        if all_articles:
+            from modules.incident_correlator import cluster_articles
+            cluster_articles(all_articles)
 
-    try:
-        from modules.actor_profiler import generate_profiles
-        generate_profiles(enriched_articles)
+            from modules.actor_profiler import generate_profiles
+            generate_profiles(all_articles)
     except Exception as e:
-        logging.debug(f"Actor profiler skipped: {e}")
+        logging.warning(f"Clustering/profiling failed: {e}")
 
     stats.finalize()
 
