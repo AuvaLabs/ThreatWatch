@@ -3047,33 +3047,42 @@ function renderBriefing(items, allText, globalTotal) {
 
   let b = '';
 
-  // Para 1: Scope and threat level
+  // Para 1: Scope and threat level — lead with what matters
+  // Filter out "General Cyber Threat" from the narrative categories
+  const meaningfulCats = topCats.filter(([cat]) => cat !== 'General Cyber Threat');
+  const topMeaningful = meaningfulCats.slice(0, 3);
+
   if (isFiltered) {
     b += `The <span class="b-hl">${regionName}</span> cyber threat posture is assessed as <span class="${tlClass}">${threatLevel}</span>. `;
-    b += `<span class="b-hl">${total}</span> of ${globalTotal} tracked incidents reference this region`;
+    b += `<span class="b-hl">${total}</span> of ${globalTotal} reported incidents reference this region`;
   } else {
     b += `The global cyber threat posture is assessed as <span class="${tlClass}">${threatLevel}</span>. `;
-    b += `Our threat intelligence pipeline is tracking <span class="b-hl">${total} active incidents</span> across <span class="b-hl">${Object.keys(catCounts).length}</span> threat categories`;
+    b += `Our threat intelligence pipeline is monitoring <span class="b-hl">${total} reported incidents</span> across <span class="b-hl">${Object.keys(catCounts).length}</span> threat categories`;
   }
   if (last24h > 0) {
     b += `, with <span class="b-hl">${last24h}</span> reported in the past 24 hours. `;
   } else {
     b += ` from recent intelligence feeds. `;
   }
+
+  // Para 2: What's happening — lead with dominant threats, not raw counts
+  if (topMeaningful.length >= 2) {
+    const topThreat = topMeaningful[0];
+    const pct = Math.round(topThreat[1] / total * 100);
+    b += `<span class="b-hl">${escapeHTML(topThreat[0])}</span> dominates the threat landscape at ${pct}% of all incidents (${topThreat[1]}), `;
+    b += `followed by <span class="b-hl">${escapeHTML(topMeaningful[1][0])}</span> (${topMeaningful[1][1]})`;
+    if (topMeaningful.length >= 3) {
+      b += ` and <span class="b-hl">${escapeHTML(topMeaningful[2][0])}</span> (${topMeaningful[2][1]})`;
+    }
+    b += `${isFiltered ? ' in this region' : ''}. `;
+  } else if (topMeaningful.length === 1) {
+    b += `<span class="b-hl">${escapeHTML(topMeaningful[0][0])}</span> is the primary threat${isFiltered ? ' in this region' : ''} with ${topMeaningful[0][1]} reported incidents. `;
+  }
   if (critCount > 0 || highCount > 0) {
     const parts = [];
-    if (critCount > 0) parts.push(`<span class="b-crit">${critCount} CRITICAL</span>`);
-    if (highCount > 0) parts.push(`<span class="b-warn">${highCount} HIGH</span>`);
-    b += `Severity breakdown includes ${parts.join(' and ')} priority incidents requiring attention. `;
-  }
-
-  // Para 2: Dominant threat categories
-  if (topCats.length >= 3) {
-    b += `The dominant threat categories are <span class="b-hl">${escapeHTML(topCats[0][0])}</span> (${topCats[0][1]}), <span class="b-hl">${escapeHTML(topCats[1][0])}</span> (${topCats[1][1]}), and <span class="b-hl">${escapeHTML(topCats[2][0])}</span> (${topCats[2][1]})${isFiltered ? ' in this region' : ''}. `;
-  } else if (topCats.length >= 2) {
-    b += `<span class="b-hl">${escapeHTML(topCats[0][0])}</span> (${topCats[0][1]}) and <span class="b-hl">${escapeHTML(topCats[1][0])}</span> (${topCats[1][1]}) are the leading threat categories${isFiltered ? ' in this region' : ''}. `;
-  } else if (topCats.length === 1) {
-    b += `<span class="b-hl">${escapeHTML(topCats[0][0])}</span> is the primary threat category${isFiltered ? ' in this region' : ''}. `;
+    if (critCount > 0) parts.push(`<span class="b-crit">${critCount} critical</span>`);
+    if (highCount > 0) parts.push(`<span class="b-warn">${highCount} high-priority</span>`);
+    b += `Of these, ${parts.join(' and ')} incidents require immediate attention. `;
   }
 
   // Para 3: Sector impact
@@ -3110,32 +3119,36 @@ function renderBriefing(items, allText, globalTotal) {
   // Para 6: Context-aware recommended actions (with drilldown)
   const topCatNames = topCats.map(c => c[0]);
   const actions = []; // { html, drilldown: {type, value} }
+  const ransomCount = catCounts['Ransomware'] || 0;
+  const breachCount = catCounts['Data Breach'] || 0;
+  const vulnCount = (catCounts['Zero-Day Exploit'] || 0) + (catCounts['Vulnerability Disclosure'] || 0);
+
   if (critCount > 0) actions.push({
-    html: `<span class="b-crit">Review ${critCount} critical advisories immediately</span> and assess organizational exposure`,
+    html: `<span class="b-crit">Review ${critCount} critical incidents</span> — assess whether your organization is exposed to these specific threats`,
     drilldown: { type: 'severity', value: 'CRITICAL' }
   });
-  if (topCatNames.includes('Ransomware')) actions.push({
-    html: 'Verify offline backup integrity, test restoration procedures, and audit RDP/VPN access controls',
+  if (ransomCount > 0) actions.push({
+    html: `<span class="b-warn">${ransomCount} ransomware incidents</span> reported — verify backup isolation, test restore procedures, check for exposed RDP/VPN`,
     drilldown: { type: 'category', value: 'Ransomware' }
   });
-  if (topCatNames.includes('Phishing') || topCatNames.includes('BEC')) actions.push({
-    html: 'Reinforce email security controls and issue staff awareness reminders for credential harvesting campaigns',
-    drilldown: { type: 'category', value: topCatNames.includes('Phishing') ? 'Phishing' : 'BEC' }
-  });
-  if (topCatNames.includes('Zero-Day Exploit') || topCatNames.includes('Vulnerability Disclosure')) actions.push({
-    html: 'Accelerate patch management cycles and review exposure to disclosed vulnerabilities',
+  if (vulnCount > 0) actions.push({
+    html: `${vulnCount} vulnerability disclosures — cross-reference with your asset inventory and prioritize patching by exploit availability`,
     drilldown: { type: 'category', value: topCatNames.includes('Zero-Day Exploit') ? 'Zero-Day' : 'Vulnerability' }
   });
   if (nationState.length > 0) actions.push({
-    html: `Conduct threat hunting for ${nationState.slice(0, 2).map(a => a.name).join('/')} TTPs and validate detection signatures`,
+    html: `Hunt for <span class="b-crit">${nationState.slice(0, 2).map(a => a.name).join('</span>, <span class="b-crit">')}</span> indicators in your environment — review ${nationState[0].origin}-linked campaign details`,
     drilldown: { type: 'actor', value: nationState[0].name }
   });
-  if (topCatNames.includes('Data Breach')) actions.push({
-    html: 'Audit data access controls, review DLP policies, and verify incident response playbooks',
+  if (breachCount > 0) actions.push({
+    html: `${breachCount} data breaches disclosed — check if your vendors, partners, or suppliers are among the affected organizations`,
     drilldown: { type: 'category', value: 'Data Breach' }
   });
+  if (topCatNames.includes('Phishing') || topCatNames.includes('BEC')) actions.push({
+    html: 'Active phishing campaigns detected — review email gateway logs for the specific lures and domains reported',
+    drilldown: { type: 'category', value: topCatNames.includes('Phishing') ? 'Phishing' : 'BEC' }
+  });
   if (topCatNames.includes('Supply Chain Attack')) actions.push({
-    html: 'Review third-party vendor access, validate software supply chain integrity, and audit dependency sources',
+    html: 'Supply chain compromises reported — audit third-party dependencies and verify software integrity',
     drilldown: { type: 'category', value: 'Supply Chain' }
   });
   if (sectorHits.length > 0 && !actions.some(a => a.html.includes('sector'))) {
@@ -3163,7 +3176,7 @@ function renderBriefing(items, allText, globalTotal) {
 
   container.innerHTML = `
     <div class="briefing-text">${b}</div>
-    <div class="briefing-timestamp">GENERATED ${new Date().toUTCString().slice(0, 25)} UTC${categoryLabel ? ` | CATEGORY: ${categoryLabel}` : ` | REGION: ${regionName.toUpperCase()}`} | ${total} ARTICLES ANALYZED</div>
+    <div class="briefing-timestamp">INTELLIGENCE DIGEST ${new Date().toUTCString().slice(0, 25)} UTC${categoryLabel ? ` | CATEGORY: ${categoryLabel}` : ` | REGION: ${regionName.toUpperCase()}`} | ${total} INCIDENTS ANALYZED</div>
   `;
 }
 
