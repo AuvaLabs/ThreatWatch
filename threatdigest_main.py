@@ -213,10 +213,11 @@ def main():
     except Exception as e:
         logging.debug(f"Webhook dispatch skipped: {e}")
 
-    # AI briefing (optional — only runs if ANTHROPIC_API_KEY is set)
+    # AI briefing + top stories (optional — only runs if LLM API key is set)
     try:
-        from modules.briefing_generator import generate_briefing
+        from modules.briefing_generator import generate_briefing, generate_top_stories
         generate_briefing(enriched_articles)
+        generate_top_stories(enriched_articles)
     except Exception as e:
         logging.debug(f"AI briefing skipped: {e}")
 
