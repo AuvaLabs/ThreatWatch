@@ -654,3 +654,101 @@ def load_top_stories() -> dict[str, Any] | None:
             return json.load(f)
     except (json.JSONDecodeError, IOError):
         return None
+
+
+# --- AI Article Summaries: batch-summarize articles missing summaries ---
+
+_SUMMARY_BATCH_SIZE = 10  # articles per LLM call
+_MAX_SUMMARIES_PER_RUN = 30  # cap per pipeline run to stay within budget
+
+_SUMMARY_PROMPT = """You are a cyber threat intelligence analyst. For each article below, write a concise 1-2 sentence summary focused on: WHAT happened, WHO was affected, and WHY it matters to defenders.
+
+Rules:
+- Each summary must be under 200 characters
+- Focus on facts, not hype
+- If the title is self-explanatory, the summary should add context not in the title
+- For CVE/vulnerability articles, mention the affected product and severity
+- Return ONLY valid JSON array — no markdown, no explanation
+
+Input format: numbered articles with title and content snippet.
+Output format:
+[
+  {"index": 1, "summary": "..."},
+  {"index": 2, "summary": "..."}
+]"""
+
+
+def summarize_articles(articles: list[dict[str, Any]]) -> int:
+    """Generate AI summaries for articles that lack them.
+
+    Modifies articles in-place. Returns count of summaries generated.
+    Uses batched calls to minimize token usage.
+    """
+    provider = _detect_provider()
+    if not provider or provider == "anthropic":
+        return 0
+
+    # Find articles missing summaries
+    needs_summary = [
+        (i, a) for i, a in enumerate(articles)
+        if not a.get("summary") and a.get("is_cyber_attack")
+        and a.get("title")
+    ]
+
+    if not needs_summary:
+        return 0
+
+    # Cap to prevent budget overrun
+    needs_summary = needs_summary[:_MAX_SUMMARIES_PER_RUN]
+    total_generated = 0
+
+    # Process in batches
+    for batch_start in range(0, len(needs_summary), _SUMMARY_BATCH_SIZE):
+        batch = needs_summary[batch_start:batch_start + _SUMMARY_BATCH_SIZE]
+
+        # Build batch prompt
+        lines = []
+        for batch_idx, (_, article) in enumerate(batch, 1):
+            title = article.get("translated_title") or article.get("title", "")
+            content = (article.get("full_content") or "")[:500]
+            lines.append(f"[{batch_idx}] {title}")
+            if content:
+                lines.append(f"    {content}")
+
+        user_content = "\n".join(lines)
+        cache_key = "summaries_" + hashlib.sha256(user_content.encode()).hexdigest()
+
+        cached = get_cached_result(cache_key)
+        if cached is not None:
+            summaries = cached
+        else:
+            try:
+                reply = _call_openai_compatible(
+                    user_content,
+                    system_prompt=_SUMMARY_PROMPT,
+                    max_tokens=800,
+                )
+                summaries = _parse_json(reply)
+                if summaries is None:
+                    continue
+                # Handle both list and dict-with-list responses
+                if isinstance(summaries, dict):
+                    summaries = summaries.get("summaries", [])
+                cache_result(cache_key, summaries)
+            except Exception as e:
+                logger.warning(f"Summary batch failed: {e}")
+                continue
+
+        # Apply summaries back to articles
+        if isinstance(summaries, list):
+            for item in summaries:
+                batch_idx = item.get("index", 0) - 1
+                summary_text = item.get("summary", "")
+                if 0 <= batch_idx < len(batch) and summary_text:
+                    orig_idx = batch[batch_idx][0]
+                    articles[orig_idx]["summary"] = summary_text
+                    total_generated += 1
+
+    if total_generated > 0:
+        logger.info(f"AI summaries generated: {total_generated} articles enriched.")
+    return total_generated
