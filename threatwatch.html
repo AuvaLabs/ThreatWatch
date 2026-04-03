@@ -2365,7 +2365,7 @@ body.self-hosted-mode .watch-section-desc .sh-only { display: inline; }
       <div class="center-section" id="section-briefing">
         <div class="center-section-title">
           <span class="section-icon">&#x1F4E1;</span> Intelligence Digest
-          <button class="briefing-mode-toggle" id="briefing-mode-toggle" onclick="toggleBriefingMode()">NORMAL</button>
+          <button class="briefing-mode-toggle ai-active" id="briefing-mode-toggle" onclick="toggleBriefingMode()">AI</button>
         </div>
         <div id="ai-briefing-content"></div>
       </div>
@@ -2735,7 +2735,7 @@ const state = {
   topStories: null,       // AI-curated top stories from server
   clusters: null,         // Incident clusters from server
   actorProfiles: null,    // Threat actor profiles from server
-  briefingMode: 'normal', // 'normal' or 'ai'
+  briefingMode: 'ai', // 'normal' or 'ai' — default to AI mode
   _etag: null,
 };
 
