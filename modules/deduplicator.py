@@ -276,7 +276,7 @@ def deduplicate_articles(articles: list[dict[str, Any]]) -> list[dict[str, Any]]
     return unique_articles
 
 
-_MAX_MERGED_REGIONS = 3  # collapse to Global if more than this many regions merge
+_MAX_MERGED_REGIONS = 2  # collapse to Global if more than 2 distinct regions merge
 
 
 def _collapse_regions(regions: set) -> str:

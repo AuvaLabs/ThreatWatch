@@ -19,8 +19,9 @@ import re
 # Patterns with word-boundary anchors avoid false matches (e.g. "Iran" in "Ukraine").
 
 _COUNTRY_PATTERNS = [
-    # North America
-    (re.compile(r"\b(U\.S\.|USA|United States|American|America)\b", re.I), "US"),
+    # North America — U.S. needs special handling: word boundary doesn't work
+    # after trailing period, so we use a lookahead instead
+    (re.compile(r"(?:^|\s|,)(U\.S\.A?\.?|USA|United States|American|America)(?:\s|,|$|')", re.I), "US"),
     (re.compile(r"\bCanadian?\b", re.I), "US"),           # group with US for region purposes
 
     # UK / British Isles
@@ -95,10 +96,26 @@ _LOCALE_REGIONS = {"US", "UK", "France", "Germany", "Japan", "South Korea",
 
 def _infer_from_text(title: str, summary: str) -> str | None:
     """Return inferred region from title (with summary as tiebreaker), or None."""
-    # Title match is strong — trust it directly
+    # Collect ALL region matches from title
+    title_regions = set()
     for pattern, region in _COUNTRY_PATTERNS:
         if pattern.search(title):
-            return region
+            title_regions.add(region)
+
+    if len(title_regions) == 1:
+        return title_regions.pop()
+
+    if len(title_regions) > 1:
+        # Multiple regions mentioned in title — prefer the target region.
+        # Heuristic: if one region is a known "attacker origin" (Middle East for
+        # Iran, APAC for China/North Korea, Europe for Russia) and the other is
+        # the likely target, prefer the target.
+        attacker_regions = {"Middle East", "APAC", "Europe"}
+        targets = title_regions - attacker_regions
+        if len(targets) == 1:
+            return targets.pop()
+        # Can't disambiguate — return Global
+        return "Global"
 
     # Summary match is weaker — only use if it's a clear single-country mention
     # (don't infer from summaries that mention many countries)

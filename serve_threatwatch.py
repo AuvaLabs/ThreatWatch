@@ -452,6 +452,56 @@ class ThreatWatchHandler(BaseHTTPRequestHandler):
             self._send_body("text/html; charset=utf-8", body, head_only)
             return
 
+        # Route: /api/trends — threat trend data and spike detection
+        if path == "/api/trends":
+            try:
+                from modules.trend_detector import get_trends_report
+                report = get_trends_report()
+                body = json.dumps(report, ensure_ascii=False).encode("utf-8")
+            except Exception as exc:
+                logger.error("Trends report error: %s", exc)
+                self._send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, "Trends report failed")
+                return
+            self._send_body("application/json; charset=utf-8", body, head_only)
+            return
+
+        # Route: /api/quality — data quality metrics and feed health
+        if path == "/api/quality":
+            try:
+                from modules.feed_health import get_health_json
+                articles = load_articles()
+                from collections import Counter
+                cat_counts = Counter(a.get("category", "Unknown") for a in articles)
+                conf_counts = Counter(a.get("confidence", 0) for a in articles)
+                unclassified = sum(1 for a in articles
+                                   if a.get("category") == "General Cyber Threat"
+                                   and a.get("confidence", 0) == 60)
+                no_summary = sum(1 for a in articles if not a.get("summary"))
+                with_epss = sum(1 for a in articles if a.get("epss_scores"))
+                with_attack = sum(1 for a in articles if a.get("attack_techniques"))
+                with_cvss = sum(1 for a in articles if a.get("cvss_score"))
+
+                quality = {
+                    "total_articles": len(articles),
+                    "unclassified_count": unclassified,
+                    "unclassified_pct": round(unclassified / max(len(articles), 1) * 100, 1),
+                    "no_summary_count": no_summary,
+                    "enrichment": {
+                        "epss_enriched": with_epss,
+                        "attack_tagged": with_attack,
+                        "cvss_scored": with_cvss,
+                    },
+                    "category_distribution": dict(cat_counts.most_common(15)),
+                    "feed_health": get_health_json(),
+                }
+                body = json.dumps(quality, ensure_ascii=False).encode("utf-8")
+            except Exception as exc:
+                logger.error("Quality report error: %s", exc)
+                self._send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, "Quality report failed")
+                return
+            self._send_body("application/json; charset=utf-8", body, head_only)
+            return
+
         # Route: /api/health — liveness + stats
         if path == "/api/health":
             body = build_health()

@@ -13,11 +13,13 @@ class TestFetchArticles:
         mock_http_resp.content = b""
         mock_get_session.return_value.get.return_value = mock_http_resp
 
+        from datetime import datetime, timezone
+        recent_date = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")
         mock_entry = MagicMock()
         mock_entry.title = "Test Article"
         mock_entry.link = "https://example.com/article"
         mock_entry.get = lambda key, default="": {
-            "published": "Mon, 01 Jan 2024",
+            "published": recent_date,
             "summary": "Test summary",
         }.get(key, default)
 
@@ -34,6 +36,8 @@ class TestFetchArticles:
     @patch("modules.feed_fetcher.feedparser.parse")
     @patch("modules.feed_fetcher._get_session")
     def test_no_global_state_accumulation(self, mock_get_session, mock_parse, mock_resolve):
+        from datetime import datetime, timezone
+        recent_date = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")
         mock_http_resp = MagicMock()
         mock_http_resp.content = b""
         mock_get_session.return_value.get.return_value = mock_http_resp
@@ -41,7 +45,10 @@ class TestFetchArticles:
         mock_entry = MagicMock()
         mock_entry.title = "Article"
         mock_entry.link = "https://example.com/1"
-        mock_entry.get = lambda key, default="": default
+        mock_entry.get = lambda key, default="": {
+            "published": recent_date,
+            "summary": "",
+        }.get(key, default)
 
         mock_parse.return_value = MagicMock(entries=[mock_entry])
 

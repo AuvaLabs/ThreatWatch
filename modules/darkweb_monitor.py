@@ -223,6 +223,9 @@ def _parse_threatfox(resp: requests.Response, source: dict[str, Any], cutoff: da
                     })
 
         # Create one article per malware family (cap at 20)
+        # Hash includes today's date so each family produces exactly ONE article
+        # per calendar day (prevents duplicate titles across pipeline runs)
+        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         for malware, info in list(malware_groups.items())[:20]:
             ioc_count = len(info["iocs"])
             sample_iocs = ", ".join(
@@ -233,7 +236,7 @@ def _parse_threatfox(resp: requests.Response, source: dict[str, Any], cutoff: da
                 f"{ioc_count} new IOC{'s' if ioc_count != 1 else ''} detected"
             )
             article_hash = hashlib.sha256(
-                (title + info["first_seen"]).encode()
+                (f"threatfox:{malware}:{today_str}").encode()
             ).hexdigest()
 
             articles.append({

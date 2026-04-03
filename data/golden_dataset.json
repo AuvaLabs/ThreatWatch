@@ -1,0 +1,782 @@
+[
+  {
+    "title": "akira ransomware: new victim 'Paass Logistik' (DE)",
+    "content": "Discovery Date: 2026-03-10\n\nFrom the company's headquarters in Houston, Exhibit Network handl es all the details involved in you...",
+    "expected_category": "Ransomware",
+    "expected_cyber": true
+  },
+  {
+    "title": "akira ransomware: new victim 'Exhibit Network' (US)",
+    "content": "Discovery Date: 2026-03-10\n\nFrom the company's headquarters in Houston, Exhibit Network handl es all the details involved in you...",
+    "expected_category": "Ransomware",
+    "expected_cyber": true
+  },
+  {
+    "title": "akira ransomware: new victim 'netCOMPONENTS' (US)",
+    "content": "Discovery Date: 2026-03-10\n\nFrom the company's headquarters in Houston, Exhibit Network handl es all the details involved in you...",
+    "expected_category": "Ransomware",
+    "expected_cyber": true
+  },
+  {
+    "title": "akira ransomware: new victim 'D3 Embedded' (US)",
+    "content": "Discovery Date: 2026-03-10\n\nFrom the company's headquarters in Houston, Exhibit Network handl es all the details involved in you...",
+    "expected_category": "Ransomware",
+    "expected_cyber": true
+  },
+  {
+    "title": "akira ransomware: new victim 'Priderock Capital Partners' (US)",
+    "content": "Discovery Date: 2026-03-10\n\nFrom the company's headquarters in Houston, Exhibit Network handl es all the details involved in you...",
+    "expected_category": "Ransomware",
+    "expected_cyber": true
+  },
+  {
+    "title": "akira ransomware: new victim 'Robinson Nursery' (US)",
+    "content": "Discovery Date: 2026-03-10\n\nFrom the company's headquarters in Houston, Exhibit Network handl es all the details involved in you...",
+    "expected_category": "Ransomware",
+    "expected_cyber": true
+  },
+  {
+    "title": "akira ransomware: new victim 'Murray's Cheese' (US)",
+    "content": "Discovery Date: 2026-03-10\n\nFrom the company's headquarters in Houston, Exhibit Network handl es all the details involved in you...",
+    "expected_category": "Ransomware",
+    "expected_cyber": true
+  },
+  {
+    "title": "akira ransomware: new victim 'Porsche Zentrum Fulda' (DE)",
+    "content": "Discovery Date: 2026-03-10\n\nFrom the company's headquarters in Houston, Exhibit Network handl es all the details involved in you...",
+    "expected_category": "Ransomware",
+    "expected_cyber": true
+  },
+  {
+    "title": "akira ransomware: new victim 'Financial Brokerage'",
+    "content": "Discovery Date: 2026-03-10\n\nFrom the company's headquarters in Houston, Exhibit Network handl es all the details involved in you...",
+    "expected_category": "Ransomware",
+    "expected_cyber": true
+  },
+  {
+    "title": "akira ransomware: new victim 'Extreme Trailers' (GB)",
+    "content": "Discovery Date: 2026-03-10\n\nFrom the company's headquarters in Houston, Exhibit Network handl es all the details involved in you...",
+    "expected_category": "Ransomware",
+    "expected_cyber": true
+  },
+  {
+    "title": "akira ransomware: new victim 'Mh Soluciones' (MX)",
+    "content": "Discovery Date: 2026-03-10\n\nFrom the company's headquarters in Houston, Exhibit Network handl es all the details involved in you...",
+    "expected_category": "Ransomware",
+    "expected_cyber": true
+  },
+  {
+    "title": "akira ransomware: new victim 'Stokes'",
+    "content": "Discovery Date: 2026-03-10\n\nFrom the company's headquarters in Houston, Exhibit Network handl es all the details involved in you...",
+    "expected_category": "Ransomware",
+    "expected_cyber": true
+  },
+  {
+    "title": "akira ransomware: new victim 'Wills Point Chevrolet' (US)",
+    "content": "Discovery Date: 2026-03-10\n\nFrom the company's headquarters in Houston, Exhibit Network handl es all the details involved in you...",
+    "expected_category": "Ransomware",
+    "expected_cyber": true
+  },
+  {
+    "title": "Akira Ransomware Indicators | Huntress",
+    "content": "Background\n\nHuntress analysts \"see\" a variety of cyberattacks taking place, with visibility into the attack itself initially becoming available at different points in the attack chain. This is true for a number of different types of cyberattacks, and is especially true for ransomware attacks. Tracking Akira ransomware attacks over the past several months, Huntress analysts have identified a number of indicators that stand out as precursors to an Akira ransomware attack.",
+    "expected_category": "Ransomware",
+    "expected_cyber": true
+  },
+  {
+    "title": "Breaking Down Ransomware Attacks and How to Stay Ahead",
+    "content": "No endpoints are immune from the threat of ransomware anymore, from businesses on shoestring security budgets to behemoth government agencies wrapped in layers of security solutions. It’s all fair game for attackers. Threat actors are dropping encryption on critical systems and demanding hefty ransom payments anywhere they can.",
+    "expected_category": "Ransomware",
+    "expected_cyber": true
+  },
+  {
+    "title": "The Impact of Data Breaches on Our Society | Huntress",
+    "content": "Traced back to a Chinese intelligence group seeking to learn more about U.S. citizens, Marriott’s infamous breach was not uncovered until 2018, four long years after their network was first compromised. During that time, including through their acquisition of Starwood hotel brands, one of the most notorious crimes in cybersecurity history was being committed.",
+    "expected_category": "Data Breach",
+    "expected_cyber": true
+  },
+  {
+    "title": "90 Business-Critical Data Breach Statistics [2025] | Huntress",
+    "content": "The most common cause of a data breach—aside from the threat actors themselves—is human error. That’s just one of many data breach statistics that reveal how challenging and dynamic data breaches are as a cyber threat. From common causes to impacts and motivations, continue reading to learn the who, what, and why of data breaches.",
+    "expected_category": "Data Breach",
+    "expected_cyber": true
+  },
+  {
+    "title": "27 Biggest Data Breaches Globally (+ Lessons) 2025 | Huntress",
+    "content": "Key Takeaways One of the biggest data breaches ever was the Chinese Surveillance Network breach, which exposed 4 billion records in June 2025. Data breaches are usually caused by cybersecurity shortcomings, like not encrypting stored data. Methods to prevent data breaches include multi-factor authentication, regular updates, and better employee training.",
+    "expected_category": "Data Breach",
+    "expected_cyber": true
+  },
+  {
+    "title": "Aspen Title & Escrow Data Breach Exposes Senstivie PII - Claim Depot",
+    "content": "",
+    "expected_category": "Data Breach",
+    "expected_cyber": true
+  },
+  {
+    "title": "Ericsson confirms data breach - Escudo Digital",
+    "content": "",
+    "expected_category": "Data Breach",
+    "expected_cyber": true
+  },
+  {
+    "title": "Earthbound Holding LLC Data Breach Investigation - Claim Depot",
+    "content": "",
+    "expected_category": "Data Breach",
+    "expected_cyber": true
+  },
+  {
+    "title": "St. Andrew's Resources for Seniors Data Breach Settlement - Claim Depot",
+    "content": "",
+    "expected_category": "Data Breach",
+    "expected_cyber": true
+  },
+  {
+    "title": "Flagstar’s $31.5 Million Data Breach Deal Wins Initial Court Nod - Bloomberg Law News",
+    "content": "",
+    "expected_category": "Data Breach",
+    "expected_cyber": true
+  },
+  {
+    "title": "Figure Lending Corp Under Investigation for Data Breach of Nearly 1 Million User Records - Schubert Jonckheer & Kolbe",
+    "content": "",
+    "expected_category": "Data Breach",
+    "expected_cyber": true
+  },
+  {
+    "title": "Stryker Corporation Data Breach: Investigation Ongoing - Claim Depot",
+    "content": "",
+    "expected_category": "Data Breach",
+    "expected_cyber": true
+  },
+  {
+    "title": "Memorial Heart Institute Ends Data Breach Suit for $3.75 Million - Bloomberg Law News",
+    "content": "",
+    "expected_category": "Data Breach",
+    "expected_cyber": true
+  },
+  {
+    "title": "Starbucks announces data breach - Computing UK",
+    "content": "",
+    "expected_category": "Data Breach",
+    "expected_cyber": true
+  },
+  {
+    "title": "Data breach on care management company impacts 5K patients at NYC Health - HealthExec",
+    "content": "",
+    "expected_category": "Data Breach",
+    "expected_cyber": true
+  },
+  {
+    "title": "Loblaw reports customer data breach after IT network intrusion - SC Media",
+    "content": "",
+    "expected_category": "Data Breach",
+    "expected_cyber": true
+  },
+  {
+    "title": "Starbucks Data Breach Exposes Personal Information of Hundreds of Users - cyberpress.org",
+    "content": "",
+    "expected_category": "Data Breach",
+    "expected_cyber": true
+  },
+  {
+    "title": "Cyber Warfare 2026: Nation-State Attacks & Global Risk - The Cyber Express",
+    "content": "",
+    "expected_category": "Nation-State Attack",
+    "expected_cyber": true
+  },
+  {
+    "title": "Officials worry Salt Typhoon apathy is killing momentum for tougher telecom security rules",
+    "content": "Two years ago, it was revealed that Chinese hackers had compromised at least ten U.S. telecoms, giving them broad access to phone data affecting nearly all Americans. Since then, public officials charged with responding to the campaign and bolstering the nation’s cyber defenses have reported a common problem.",
+    "expected_category": "Nation-State Attack",
+    "expected_cyber": true
+  },
+  {
+    "title": "APT28 Uses BEARDSHELL and COVENANT Malware to Spy on Ukrainian Military",
+    "content": "The Russian state-sponsored hacking group tracked as APT28 has been observed using a pair of implants dubbed BEARDSHELL and COVENANT to facilitate long‑term surveillance of Ukrainian military personnel. The two malware families have been put to use since April 2024, ESET said in a new report shared with The Hacker News. APT28, also tracked as Blue Athena, BlueDelta, Fancy Bear, Fighting Ursa, Forest Blizzard (formerly Strontium), FROZENLAKE, Iron Twilight, ITG05, Pawn Storm, Sednit, Sofacy, a...",
+    "expected_category": "Nation-State Attack",
+    "expected_cyber": true
+  },
+  {
+    "title": "APT28 hackers deploy customized variant of Covenant open-source tool",
+    "content": "The Russian state-sponsored APT28 threat group is using a custom variant of the open-source Covenant post-exploitation framework for long-term espionage operations. Also tracked as Fancy Bear, Forest Blizzard, Strontium, and Sednit, the APT28 hacker group is known for developing high-end implants and breaching notable entities, such as the German Parliament, multiple French organizations, government networks in Poland, and European NATO member countries. Researchers at cybersecurity company E...",
+    "expected_category": "Nation-State Attack",
+    "expected_cyber": true
+  },
+  {
+    "title": "🚨 APT28 exploits MSHTML zero-day (CVE-2026-21513) Malicious LNK files are being used to bypass defenses and execute arbitrary code on Windows systems. High-profile organizations are the primary targets. Patch and monitor systems immediately. #Cyb - x.com",
+    "content": "APT28 is actively exploiting a previously unknown MSHTML zero-day vulnerability (CVE-2026-21513) using malicious LNK files to bypass security defenses and achieve arbitrary code execution on Windows systems. High-profile organizations are being targeted in this campaign. Immediate patching and system monitoring are recommended to mitigate the threat.",
+    "expected_category": "Nation-State Attack",
+    "expected_cyber": true
+  },
+  {
+    "title": "Beware the growing spyware wave. For the first time, commercial surveillance vendors last year topped Google’s list of groups exploiting zero-day vulnerabilities in the wild, overtaking nation-state attackers — particularly those from China. Read the full analysi - x.com",
+    "content": "Commercial surveillance vendors have surpassed nation-state actors, particularly Chinese groups, in exploiting zero-day vulnerabilities, according to Google's analysis. This marks a significant shift in the threat landscape, with commercial spyware operators now leading in zero-day exploitation activities. The trend highlights the growing sophistication and resources of commercial surveillance vendors compared to traditional state-sponsored threat actors.",
+    "expected_category": "Nation-State Attack",
+    "expected_cyber": true
+  },
+  {
+    "title": "APT28 Tied to CVE-2026-21513 MSHTML 0-Day Exploited Before Feb 2026 Patch Tuesday",
+    "content": "A recently disclosed security flaw patched by Microsoft may have been exploited by the Russia-linked state-sponsored threat actor known as APT28, according to new findings from Akamai. The vulnerability in question is CVE-2026-21513 (CVSS score: 8.8), a high-severity security feature bypass affecting the MSHTML Framework. \"Protection mechanism failure in MSHTML Framework allows an unauthorized attacker to bypass a security feature over a network,\" Microsoft noted in its advisory for the flaw.",
+    "expected_category": "Nation-State Attack",
+    "expected_cyber": true
+  },
+  {
+    "title": "Nation-State Actor Embraces AI Malware Assembly Line",
+    "content": "A nation-state threat actor has adopted artificial intelligence capabilities to automate and scale malware development and deployment operations. This represents a significant escalation in cyber warfare tactics, enabling faster creation of customized malware variants and more efficient targeting of multiple victims. The use of AI-driven malware assembly processes suggests advanced adversaries are leveraging machine learning to overcome traditional detection methods and increase operational effectiveness.",
+    "expected_category": "Nation-State Attack",
+    "expected_cyber": true
+  },
+  {
+    "title": "APT28-Linked Campaign Deploys BadPaw Loader and MeowMeow Backdoor in Ukraine",
+    "content": "Russian state-sponsored threat actor APT28 has launched a sophisticated cyber campaign targeting Ukrainian entities using two previously undocumented malware families: BadPaw loader and MeowMeow backdoor. The attack chain begins with phishing emails containing links to ZIP archives with deceptive Ukrainian-language lure documents about border crossing appeals, followed by deployment of the .NET-based BadPaw loader that fetches the MeowMeow backdoor capable of executing PowerShell commands and file system operations. The malware includes multiple evasion techniques such as sandbox detection, anti-forensics checks, and decoy GUIs designed to mislead analysis, indicating a highly sophisticated operation targeting Ukrainian government or critical infrastructure entities.",
+    "expected_category": "Nation-State Attack",
+    "expected_cyber": true
+  },
+  {
+    "title": "Zero-Day Vulnerabilities in Platforms Could Leave MSPs Exposed | Huntress",
+    "content": "Let’s put our adversarial hats on, shall we? Say you were a malicious hacker, and you wanted to target the top managed service providers (MSPs). How would you do it?",
+    "expected_category": "Zero-Day Exploit",
+    "expected_cyber": true
+  },
+  {
+    "title": "New 0-Day Vulnerabilities Found in Microsoft Exchange | Huntress",
+    "content": "Our team is currently investigating new 0-day vulnerabilities in Microsoft Exchange servers that could lead to Remote Code Execution (RCE) for an authenticated user. Our ThreatOps team discovered this blog, and the team began to research and see if anyone else in the community had flagged it. We found this tweet from Security Researcher Kevin Beaumont, where he notes that “significant numbers of Exchange servers have been backdoored - including a honeypot.”\n\nWe’ll continue to update this blog...",
+    "expected_category": "Zero-Day Exploit",
+    "expected_cyber": true
+  },
+  {
+    "title": "Apple Fixes Exploited Zero-Day Affecting iOS, macOS, and Apple Devices dlvr.it/TRTTn2 #Apple #iOS #macOS #CyberSecurity #ZeroDay - x.com",
+    "content": "",
+    "expected_category": "Zero-Day Exploit",
+    "expected_cyber": true
+  },
+  {
+    "title": "Google patched two critical zero-day vulnerabilities in Chrome exploited in the wild: CVE-2026-3909 in Skia graphics and CVE-2026-3910 in V8 engine allowing sandbox escape. Updates released for all platforms. #ChromeUpdate #ZeroDay #USA - x.com",
+    "content": "",
+    "expected_category": "Zero-Day Exploit",
+    "expected_cyber": true
+  },
+  {
+    "title": "Zero-Day Alert — Chrome Google fixed two actively exploited Chrome flaws: CVE-2026-3909 and CVE-2026-3910. Update Chrome now. Chromium-based browsers should patch as fixes land. #CyberSecurity #Chrome #ZeroDay - x.com",
+    "content": "",
+    "expected_category": "Zero-Day Exploit",
+    "expected_cyber": true
+  },
+  {
+    "title": "Why do zero-day exploits seem more common lately? One theory: AI may be speeding up vulnerability research. The hosts discuss how attackers aren’t simply asking AI to generate exploits—but using it as a tool to accelerate analysis, reverse engineering, an - x.com",
+    "content": "",
+    "expected_category": "Zero-Day Exploit",
+    "expected_cyber": true
+  },
+  {
+    "title": "CISA Warns SolarWinds and Ivanti Vulnerabilities Are Actively Exploited - Security Boulevard",
+    "content": "",
+    "expected_category": "Zero-Day Exploit",
+    "expected_cyber": true
+  },
+  {
+    "title": "Google fixed two new actively exploited flaws in the Chrome browser - Security Affairs",
+    "content": "",
+    "expected_category": "Zero-Day Exploit",
+    "expected_cyber": true
+  },
+  {
+    "title": "Two New Google Chrome Zero-Day Vulnerabilities Actively Exploited for Code Execution - cyberpress.org",
+    "content": "",
+    "expected_category": "Zero-Day Exploit",
+    "expected_cyber": true
+  },
+  {
+    "title": "Google Patches Two Chrome Zero-Day Vulnerabilities Actively Exploited in the Wild - eSecurity Planet",
+    "content": "",
+    "expected_category": "Zero-Day Exploit",
+    "expected_cyber": true
+  },
+  {
+    "title": "Google warns of two actively exploited Chrome zero days - csoonline.com",
+    "content": "",
+    "expected_category": "Zero-Day Exploit",
+    "expected_cyber": true
+  },
+  {
+    "title": "Chrome Zero-Day Vulnerabilities Actively Exploited in the Wild to Execute Malicious Code - CyberSecurityNews",
+    "content": "",
+    "expected_category": "Zero-Day Exploit",
+    "expected_cyber": true
+  },
+  {
+    "title": "Google rushes Chrome update fixing two zero-days already under attack - theregister.com",
+    "content": "",
+    "expected_category": "Zero-Day Exploit",
+    "expected_cyber": true
+  },
+  {
+    "title": "Chrome 146 Update Patches Two Exploited Zero-Days - SecurityWeek",
+    "content": "",
+    "expected_category": "Zero-Day Exploit",
+    "expected_cyber": true
+  },
+  {
+    "title": "Update Chrome Immediately to Fix This Zero-Day Exploit",
+    "content": "In addition to Lifehacker, her work has been featured on Wirecutter, Tom’s Guide, and ZDNET . Emily has also worked as a travel guide around the U.S. and as a content editor.",
+    "expected_category": "Zero-Day Exploit",
+    "expected_cyber": true
+  },
+  {
+    "title": "Ask Huntress: Fake .XPS Invoice Leading to Credential Phishing",
+    "content": "The Backstory\n\nToday’s request came from a partner looking for feedback on how to defend against a campaign of phishing emails that slipped past their anti-spam solution. They forwarded our ThreatOps Team a copy of the phishing email and immediately we noticed it was tailored to impersonate the targeted company (in this blog, all company references have been replaced with VICTIMCOMPANY):\n\nThe original phishing email. This phishing campaign used the age-old “Please remit payment” spiel to lure...",
+    "expected_category": "Phishing",
+    "expected_cyber": true
+  },
+  {
+    "title": "Project 0 pledges refunds after GitHub compromise triggers phishing attack on DeFi users",
+    "content": "",
+    "expected_category": "Phishing",
+    "expected_cyber": true
+  },
+  {
+    "title": "Will AI Save Consumers From Smartphone-Based Phishing Attacks?",
+    "content": "",
+    "expected_category": "Phishing",
+    "expected_cyber": true
+  },
+  {
+    "title": "Threat Actors Leverage Iran Chaos in Phishing Attacks - digit.fyi",
+    "content": "",
+    "expected_category": "Phishing",
+    "expected_cyber": true
+  },
+  {
+    "title": "Phishing Campaign Delivers BeatBanker Trojan To Spread Cryptocurrency Miner and RAT - cyberpress.org",
+    "content": "",
+    "expected_category": "Phishing",
+    "expected_cyber": true
+  },
+  {
+    "title": "BONK.fun warns users after domain compromise triggers phishing attack",
+    "content": "The team behind BONK.fun, a meme-coin platform built around the Bonk ecosystem, has warned users not to interact with its website after a malicious actor compromised the project’s domain. In a post on X on 12 March, the platform said a “malicious actor has compromised the BONKfun domain.” It urged users to avoid the website until the issue is fully resolved. The team did not immediately provide details about the nature of the breach or the number of users potentially affected.",
+    "expected_category": "Phishing",
+    "expected_cyber": true
+  },
+  {
+    "title": "Phishing Attack Targets LastPass Users via Fake Support Emails - cyberpress.org",
+    "content": "",
+    "expected_category": "Phishing",
+    "expected_cyber": true
+  },
+  {
+    "title": "Signal and WhatsApp accounts targeted in phishing campaign",
+    "content": "Dutch intelligence services AIVD and MIVD warn that Russian state‑backed hackers are running a large‑scale campaign to break into Signal and WhatsApp accounts of high‑value targets. The targets are said to be senior officials, military personnel, civil servants, and journalists. The attackers are not breaking end‑to‑end encryption or exploiting a vulnerability in the apps themselves.",
+    "expected_category": "Phishing",
+    "expected_cyber": true
+  },
+  {
+    "title": "Phishing campaign spoofs local officials to steal permit fees",
+    "content": "The FBI is warning about a phishing scheme in which cybercriminals impersonate city and county officials to solicit fraudulent payments for planning and zoning permits. Criminals mine publicly available permit data to find likely targets and make their outreach appear legitimate. Investigators say victims receive unsolicited emails that cite legitimate permit details, including zoning application numbers and property addresses.",
+    "expected_category": "Phishing",
+    "expected_cyber": true
+  },
+  {
+    "title": "Phishing Campaign Uses Google Cloud to Host Malicious Redirects via GCS Bucket - gbhackers.com",
+    "content": "A phishing campaign has been identified that leverages Google Cloud Storage (GCS) buckets to host malicious redirects, exploiting the legitimacy of Google's infrastructure to evade detection. Attackers are using this technique to redirect victims to phishing pages or malware distribution sites while appearing to originate from a trusted cloud provider. This method is particularly effective because security filters often whitelist Google Cloud domains, making it difficult for traditional email and web security solutions to block the malicious content.",
+    "expected_category": "Phishing",
+    "expected_cyber": true
+  },
+  {
+    "title": "New phishing attacks exploit stolen digital certificates for malicious software - SC Media",
+    "content": "Attackers are leveraging stolen digital certificates in phishing campaigns to distribute malicious software, increasing the credibility and effectiveness of their attacks. By using legitimate-looking certificates, threat actors can bypass security controls and user skepticism, making it harder for organizations to detect and block malicious payloads. This technique combines phishing social engineering with certificate abuse to compromise systems and potentially establish persistent access for further attacks.",
+    "expected_category": "Phishing",
+    "expected_cyber": true
+  },
+  {
+    "title": "Fake Google Security page used in PWA phishing campaign - SC Media",
+    "content": "Attackers are leveraging Progressive Web Apps (PWAs) to create convincing fake Google Security pages in a phishing campaign. The fake pages are designed to trick users into entering their credentials by mimicking legitimate Google security interfaces. This attack demonstrates how PWAs can be weaponized to bypass traditional security warnings and increase the success rate of credential harvesting attacks.",
+    "expected_category": "Phishing",
+    "expected_cyber": true
+  },
+  {
+    "title": "Infostealers Crash Course: A Tradecraft Tuesday Recap",
+    "content": "If a threat actor launches a ransomware, extortion, or identity theft attack, the odds are that infostealers—and the credentials they’ve compromised—are behind it. Infostealers have quickly evolved into a major threat, fueling high-profile data breaches. It’s no wonder Huntress’ 2025 Cyber Threat Report found that infostealers represented almost a quarter of all incidents our team saw last year.",
+    "expected_category": "Malware",
+    "expected_cyber": true
+  },
+  {
+    "title": "PeerBlight Linux Backdoor Exploits React2Shell CVE-2025-55182",
+    "content": "TL;DR: Huntress is seeing threat actors exploit a vulnerability in React Server Components (CVE-2025-55182) across several organizations in our customer base. Attackers have attempted to deploy cryptominer malware, a Linux backdoor we're tracking as PeerBlight, a reverse proxy tunnel we call CowTunnel, and a Go-based post-exploitation implant dubbed ZinFoq as part of their post-exploitation activity. We also observed a Kaiji botnet variant being distributed through this campaign.",
+    "expected_category": "Malware",
+    "expected_cyber": true
+  },
+  {
+    "title": "Uncovering a Colombian Malware Campaign with AI Code Analysis",
+    "content": "VirusTotal Code Insight keeps adding new file formats. This time, we’re looking at two vector-based formats from very different eras: SWF and SVG. Curiously, right after we rolled out this update in production, one of the very first submitted files gave us a perfect, and unexpected, example of Code Insight in action: it uncovered an undetected malware campaign using SVG files that impersonated the Colombian justice system.",
+    "expected_category": "Malware",
+    "expected_cyber": true
+  },
+  {
+    "title": "New Infostealer Campaign Targets Users via Spoofed Software Installers",
+    "content": "Introduction\n\nAs part of our commitment to sharing interesting hunts, we are launching these 'Flash Hunting Findings' to highlight active threats. Our latest investigation tracks an operation active between January 11 and January 15, 2026, which uses consistent ZIP file structures and a unique behash (\"4acaac53c8340a8c236c91e68244e6cb\") for identification. The campaign relies on a trusted executable to trick the operating system into loading a malicious payload, leading to the execution of se...",
+    "expected_category": "Malware",
+    "expected_cyber": true
+  },
+  {
+    "title": "KadNap Botnet Hijacks 14,000 Devices to Launch Global Cyber Attacks - The420.in",
+    "content": "",
+    "expected_category": "Malware",
+    "expected_cyber": true
+  },
+  {
+    "title": "ESET launches eCrime Reports to track ransomware and infostealer attacks - BetaNews",
+    "content": "",
+    "expected_category": "Malware",
+    "expected_cyber": true
+  },
+  {
+    "title": "Storm-2561 Spreads Trojan VPN Clients via SEO Poisoning to Steal Credentials",
+    "content": "Microsoft has disclosed details of a credential theft campaign that employs fake virtual private network (VPN) clients distributed through search engine optimization (SEO) poisoning techniques. \"The campaign redirects users searching for legitimate enterprise software to malicious ZIP files on attacker-controlled websites to deploy digitally signed trojans that masquerade as trusted VPN clients while harvesting VPN credentials,\" the Microsoft Threat Intelligence and Microsoft Defender Experts...",
+    "expected_category": "Malware",
+    "expected_cyber": true
+  },
+  {
+    "title": "Real-Time Banking Trojan Strikes Brazil's Pix Users",
+    "content": "",
+    "expected_category": "Malware",
+    "expected_cyber": true
+  },
+  {
+    "title": "Authorities Disrupt SocksEscort Proxy Botnet Exploiting 369,000 IPs Across 163 Countries",
+    "content": "A court-authorized international law enforcement operation has dismantled a criminal proxy service named SocksEscort that enslaved thousands of residential routers worldwide into a botnet for committing large-scale fraud. \"SocksEscort infected home and small business internet routers with malware,\" the U.S. Department of Justice (DoJ) said.",
+    "expected_category": "Malware",
+    "expected_cyber": true
+  },
+  {
+    "title": "Kaspersky uncovers a new Android malware campaign disguised as Starlink application",
+    "content": "",
+    "expected_category": "Malware",
+    "expected_cyber": true
+  },
+  {
+    "title": "Fake government and Starlink apps used in malware campaign targeting Brazil",
+    "content": "Researchers discovered new Android malware capable of stealing banking credentials, tampering with cryptocurrency transactions and secretly mining digital currency on infected devices in Brazil. The malware, dubbed BeatBanker by Russian cybersecurity firm Kaspersky, infects smartphones through fake applications that mimic legitimate services, including the Starlink satellite internet app and the Brazilian government portal INSS Reembolso. Both apps were available for download from a website m...",
+    "expected_category": "Malware",
+    "expected_cyber": true
+  },
+  {
+    "title": "Agentic attack chains advance as infostealers flood criminal markets",
+    "content": "Cybercriminals spent much of 2025 automating their operations, shifting from one-off attacks to systems that can run entire intrusion cycles with minimal human input. Data collected from criminal forums, illicit marketplaces, and underground chat services shows a threat environment where stolen identity data, unpatched vulnerabilities, and ransomware operations are interdependent. The findings come from Flashpoint’s 2026 Global Threat Intelligence Report, pulling data directly from sources ac...",
+    "expected_category": "Malware",
+    "expected_cyber": true
+  },
+  {
+    "title": "Zoom and Teams Apps Targeted By Signed Malware Carrying RMM Backdoors - cyberpress.org",
+    "content": "",
+    "expected_category": "Malware",
+    "expected_cyber": true
+  },
+  {
+    "title": "Compromised WordPress Sites Deliver ClickFix Attacks in Global Infostealer Campaign",
+    "content": "A widespread cyber-criminal campaign has compromised legitimate WordPress websites to infect visitors with infostealer malware, threat researchers at Rapid 7 have warned. The global operation has compromised over 250 websites including regional news publications, local business websites and a US Senate candidate’s official webpage. Sites in at least 12 countries have been impacted, including: Australia, Brazil, Canada, Czechia, Germany, India, Israel, Singapore, Slovakia, Switzerland, the UK ...",
+    "expected_category": "Malware",
+    "expected_cyber": true
+  },
+  {
+    "title": "China-Linked Hackers Hit Qatar with Backdoor Disguised as War News - Hackread",
+    "content": "",
+    "expected_category": "Malware",
+    "expected_cyber": true
+  },
+  {
+    "title": "CVE-2017-18362: Arbitrary SQL Execution in ManagedITSync Integration",
+    "content": "A vulnerability was discovered and disclosed in late 2017 that affected the ConnectWise ManagedITSync integration, designed to sync data between the ConnectWise Manage PSA and the Kaseya VSA RMM. This vulnerability allows a remote attacker to execute arbitrary SQL commands against the Kaseya VSA database, which means they can create administrative users, change user passwords, or even create tasks to deploy software to all endpoints under management. ConnectWise created a patch and notified t...",
+    "expected_category": "Vulnerability Disclosure",
+    "expected_cyber": true
+  },
+  {
+    "title": "Critical RCE Vulnerability: log4j - CVE-2021-44228 | Huntress",
+    "content": "Our team is investigating CVE-2021-44228, a critical vulnerability that’s affecting a Java logging package log4j which is used in a significant amount of software, including Apache, Apple iCloud, Steam, Minecraft and others. Huntress is actively uncovering the effects of this vulnerability and will be frequently updating this page. At this point, we have not identified an impact to The Huntress Security Platform, but our teams are diligently checking to ensure all instances of our back-end ar...",
+    "expected_category": "Vulnerability Disclosure",
+    "expected_cyber": true
+  },
+  {
+    "title": "Veeam Backup & Replication CVE-2023-27532 Response | Huntress",
+    "content": "UPDATE 03/13/2023 2252 ET: After taking further inventory of our partner's Veeam service binary details to review the version number, we uncovered many more unpatched and vulnerable hosts. We are sending incident reports for all affected partners and making direct phone calls when Veeam is publicly exposed on the Internet. On 7 March 2023, Veeam published a knowledge base article outlining CVE-2023-27532, a vulnerability in the Veeam Backup & Replication component that allowed an unauthentica...",
+    "expected_category": "Vulnerability Disclosure",
+    "expected_cyber": true
+  },
+  {
+    "title": "Everything We Know About CVE-2023-23397 | Huntress",
+    "content": "Huntress has been tracking CVE-2023-23397, a critical vulnerability/0-day that impacts Microsoft Outlook. Unlike other exploits we’ve seen in the past, this exploit is particularly dangerous because no user interaction is required to trigger the exploit. Once an infected email arrives in a Microsoft Outlook inbox, sensitive credential hashes can be obtained.",
+    "expected_category": "Vulnerability Disclosure",
+    "expected_cyber": true
+  },
+  {
+    "title": "MOVEit Transfer Critical Vulnerability CVE-2023-34362 Rapid Response",
+    "content": "UPDATED: 1 June 2023 @ 1733 ET - Added shareable Huntress YARA rule for assistance in detection effort\n\nUPDATED: 1 June 2023 @ 2023 ET - Added Kostas community Sigma rule to assist in detection efforts\n\nUPDATED: 1 June 2023 @ 2029 ET - Added screenshots for the DLL that creates the human2.aspx file\n\nUPDATED: 2 June 2023 @ 1210 ET - Added CVE identification\n\nUPDATED: 2 June 2023 @ 1750 ET - Added registry locations for enriched investigation and analysis\n\nUPDATED: 5 June 2023 @ 1323 ET - Added...",
+    "expected_category": "Vulnerability Disclosure",
+    "expected_cyber": true
+  },
+  {
+    "title": "Another PaperCut: CVE-2023-39143 Remote Code Execution | Huntress",
+    "content": "On August 5, Huntress was made aware of the recently uncovered vulnerability tracked as CVE-2023-39143. For overall statistics, in our partner base we have over 1,000 vulnerable servers across 812 different companies. We have begun outreach efforts to all of our partners.",
+    "expected_category": "Vulnerability Disclosure",
+    "expected_cyber": true
+  },
+  {
+    "title": "Critical Vulnerability: WebP Heap Buffer Overflow (CVE-2023-4863) | Huntress",
+    "content": "The Huntress team is currently investigating CVE-2023-4863, a heap buffer overflow in the WebP image encoding/decoding (codec) library (libwebp). Threat actors are exploiting this critical vulnerability in the wild, which affects anything using the libwebp library version prior to 1.3.2. This is a rapidly evolving situation, and we will update this blog post with information we receive and confirm—but here’s everything we know so far:\n\nWhat’s Happening?",
+    "expected_category": "Vulnerability Disclosure",
+    "expected_cyber": true
+  },
+  {
+    "title": "Critical Vulnerability: Exploitation of Apache ActiveMQ CVE-2023-46604 | Huntress",
+    "content": "A partner recently deployed Huntress agents on October 30, 2023, after experiencing a “HelloKitty” ransomware attack on October 27. This ransomware attack followed closely with what was described by Rapid7 in their blog post on November 1, titled Suspected Exploitation of Apache ActiveMQ CVE-2023-46604. What Is CVE-2023-46604?",
+    "expected_category": "Vulnerability Disclosure",
+    "expected_cyber": true
+  },
+  {
+    "title": "Confluence to Cerber: Exploitation of ​​CVE-2023-22518",
+    "content": "On October 31, 2023, Atlassian published patches and an advisory for CVE-2023-22518, an improper authorization vulnerability affecting Confluence Data Center and Confluence Server. Later, on November 3, 2023, additional information was released from Atlassian identifying in-the-wild exploitation of CVE-2023-22518. In addition to observations from other organizations, Huntress can confirm active exploitation starting on November 3 post patch release.",
+    "expected_category": "Vulnerability Disclosure",
+    "expected_cyber": true
+  },
+  {
+    "title": "Critical Vulnerability: SysAid CVE-2023-47246 | Huntress",
+    "content": "On November 8, 2023, SysAid published an advisory expressing that their on-premise server software had a previously undisclosed vulnerability and is aware of public in-the-wild exploitation. Days prior, Microsoft had notified SysAid of this issue and that they attributed these compromises to TA505 “Lace Tempest”, often known as the cl0p ransomware gang. Huntress has investigated recent intrusions within our partner environments, notified impacted organizations, and recreated the attack chain ...",
+    "expected_category": "Vulnerability Disclosure",
+    "expected_cyber": true
+  },
+  {
+    "title": "Understanding the ConnectWise ScreenConnect CVE-2024-1709 & CVE-2024-1708 | Huntress",
+    "content": "On February 19, 2024, ConnectWise published a security advisory for ScreenConnect version 23.9.8, referencing two vulnerabilities and software weaknesses. The same day, Huntress researchers worked to understand this threat and successfully recreated a proof-of-concept exploit demonstrating its impact. This write-up will discuss our analysis efforts and the technical details behind this attack, which we’re coining as “SlashAndGrab.”\n\nThe ConnectWise advisory indicated that in all versions of S...",
+    "expected_category": "Vulnerability Disclosure",
+    "expected_cyber": true
+  },
+  {
+    "title": "SlashAndGrab: ScreenConnect Post-Exploitation in the Wild (CVE-2024-1709 & CVE-2024-1708) | Huntress",
+    "content": "Table of Contents:\n\nSince February 19, Huntress has been sharing technical details of the ScreenConnect vulnerability we’re calling “SlashAndGrab.” In previous posts, we shared the details of this vulnerability, its exploit, and shared detection guidance. In this article, we’ve collected and curated threat actor activity fresh from the Huntress Security Operations Center (SOC), where our team has detected and kicked out active adversaries leveraging ScreenConnect access for post-exploitation ...",
+    "expected_category": "Vulnerability Disclosure",
+    "expected_cyber": true
+  },
+  {
+    "title": "NETSCOUT report highlights rise in large-scale, AI-driven DDoS attacks worldwide - Express Computer",
+    "content": "",
+    "expected_category": "DDoS",
+    "expected_cyber": true
+  },
+  {
+    "title": "AI-fuelled DDoS attacks surge past eight million globally - SecurityBrief Australia",
+    "content": "",
+    "expected_category": "DDoS",
+    "expected_cyber": true
+  },
+  {
+    "title": "Germany & Israel Under DDoS Attacks: Weekly DDoS Threat Intelligence Analysis - SOCRadar® Cyber Intelligence Inc.",
+    "content": "",
+    "expected_category": "DDoS",
+    "expected_cyber": true
+  },
+  {
+    "title": "Cisco IOS XR Software Multi-Instance Intermediate System-to-Intermediate System Denial of Service Vulnerability",
+    "content": "A vulnerability in the Intermediate System-to-Intermediate System (IS-IS) multi-instance routing feature of Cisco IOS XR Software could allow an unauthenticated, adjacent attacker to cause the IS-IS process to restart unexpectedly. This vulnerability is due to insufficient input validation of ingress IS-IS packets. An attacker could exploit this vulnerability by sending crafted IS-IS packets to an affected device after forming an adjacency.",
+    "expected_category": "DDoS",
+    "expected_cyber": true
+  },
+  {
+    "title": "Cisco IOS XR Egress Packet Network Interface Aligner Interrupt Denial of Service Vulnerability",
+    "content": "A vulnerability in the handling of an Egress Packet Network Interface (EPNI) Aligner interrupt in Cisco IOS XR Software for Cisco Network Convergence System (NCS) 5500 Series with NC57 line cards and Cisco NCS 5700 Routers and Cisco IOS XR Software for Third Party Software could allow an unauthenticated, remote attacker to cause the network processing unit (NPU) and ASIC to stop processing, preventing traffic from traversing the interface. This vulnerability is due to the corruption of packet...",
+    "expected_category": "DDoS",
+    "expected_cyber": true
+  },
+  {
+    "title": "Global Hacktivist Campaign Triggers 149 DDoS Attacks on 110 Organizations Across 16 Countries - CXO Digitalpulse",
+    "content": "",
+    "expected_category": "DDoS",
+    "expected_cyber": true
+  },
+  {
+    "title": "Dark‑Web LLMs Are Supercharging DDoS Attacks - digit.fyi",
+    "content": "",
+    "expected_category": "DDoS",
+    "expected_cyber": true
+  },
+  {
+    "title": "Teen crew caught selling DDoS attack tools",
+    "content": "Seven minors who distributed online programs designed to facilitate DDoS attacks have been identified by Poland’s Central Bureau for Combating Cybercrime (CBZC). They were between 12 and 16 at the time of the crime. CBZC officer during a cybercrime investigation (Source: Poland’s Central Bureau for Combating Cybercrime)\n\nAccording to investigators, using the tools they administered, the minors attacked popular websites, including auction and sales portals, IT domains, hosting services and acc...",
+    "expected_category": "DDoS",
+    "expected_cyber": true
+  },
+  {
+    "title": "Lessons Learned During the Kaseya VSA Supply Chain Attack | Huntress",
+    "content": "On July 2, 2021, as many people in the United States were preparing for the July 4 holiday, a major ransomware attack began to unfold. The REvil ransomware group carried out a sophisticated supply chain attack against Kaseya’s VSA product. The attack is believed to have affected between 50 and 60 MSPs—and between 1,500 and 2,000 of their customers.",
+    "expected_category": "Supply Chain Attack",
+    "expected_cyber": true
+  },
+  {
+    "title": "Rising Supply Chain Attacks on Cybersecurity Ecosystems | Huntress",
+    "content": "Cybersecurity has always relied on trust. Every software update, hardware purchase, and cloud integration depends on the implicit belief that vendors will protect their customers. That trust affords both parties operational fluidity, allowing teams to adopt new capabilities and maintain systems without having to question the integrity of every single component.",
+    "expected_category": "Supply Chain Attack",
+    "expected_cyber": true
+  },
+  {
+    "title": "GlassWorm Supply-Chain Attack Abuses 72 Open VSX Extensions to Target Developers",
+    "content": "Cybersecurity researchers have flagged a new iteration of the GlassWorm campaign that they say represents a \"significant escalation\" in how it propagates through the Open VSX registry. \"Instead of requiring every malicious listing to embed the loader directly, the threat actor is now abusing extensionPack and extensionDependencies to turn initially standalone-looking extensions into transitive delivery vehicles in later updates, allowing a benign-appearing package to begin pulling a separate ...",
+    "expected_category": "Supply Chain Attack",
+    "expected_cyber": true
+  },
+  {
+    "title": "Supply-chain attack using invisible code hits GitHub and other repositories - Ars Technica",
+    "content": "",
+    "expected_category": "Supply Chain Attack",
+    "expected_cyber": true
+  },
+  {
+    "title": "Six Supply Chain Attack Groups to Watch Out for in 2026 - Group-IB",
+    "content": "",
+    "expected_category": "Supply Chain Attack",
+    "expected_cyber": true
+  },
+  {
+    "title": "Cynomi Identifies Third-Party Risk as the Largest Untapped Revenue Opportunity for MSPs as 45 Percent of Organizations Face Supply Chain Attacks - The Manila Times",
+    "content": "",
+    "expected_category": "Supply Chain Attack",
+    "expected_cyber": true
+  },
+  {
+    "title": "UNC6426 Exploits nx npm Supply-Chain Attack to Gain AWS Admin Access in 72 Hours - The Hacker News",
+    "content": "",
+    "expected_category": "Supply Chain Attack",
+    "expected_cyber": true
+  },
+  {
+    "title": "Seqrite Warns of Rising Software Supply Chain Attacks in 2026 - TimesTech",
+    "content": "Seqrite has issued a warning about an anticipated increase in software supply chain attacks expected in 2026. The advisory highlights the growing threat landscape where attackers target vulnerabilities in software development and distribution channels to compromise multiple organizations simultaneously. This type of attack poses significant risks as it can affect numerous downstream users and enterprises that rely on compromised software components or updates.",
+    "expected_category": "Supply Chain Attack",
+    "expected_cyber": true
+  },
+  {
+    "title": "Veeam Security Patch Fixes Critical RCE in Backup Platform - The Cyber Express",
+    "content": "",
+    "expected_category": "Patch/Security Update",
+    "expected_cyber": true
+  },
+  {
+    "title": "Google Chrome Security Update Fixes 29 Vulnerabilities, Including Remote Code Execution Flaws - cyberpress.org",
+    "content": "",
+    "expected_category": "Patch/Security Update",
+    "expected_cyber": true
+  },
+  {
+    "title": "Apple Issues Security Updates for Older iOS Devices Targeted by Coruna WebKit Exploit",
+    "content": "Apple on Wednesday backported fixes for a security flaw in iOS, iPadOS, and macOS Sonoma to older versions after it was found to be used as part of the Coruna exploit kit. The vulnerability, tracked as CVE-2023-43010, relates to an unspecified vulnerability in WebKit that could result in memory corruption when processing maliciously crafted web content. The iPhone maker said the issue was addressed with improved handling.",
+    "expected_category": "Patch/Security Update",
+    "expected_cyber": true
+  },
+  {
+    "title": "Microsoft Fixes 79 Flaws in March Patch Tuesday, Including Two 0-Days - Hackread",
+    "content": "",
+    "expected_category": "Patch/Security Update",
+    "expected_cyber": true
+  },
+  {
+    "title": "March 2026 Patch Tuesday: Eight Critical Vulnerabilities and Two Publicly Disclosed Among 82 CVEs Patched",
+    "content": "Critical Vulnerability in Microsoft Devices Pricing Program\n\nCVE-2026-21536 is a Critical remote code execution vulnerability affecting Microsoft Devices Pricing Program and has a CVSS score of 9.8. This vulnerability enables unauthenticated remote attackers to execute arbitrary code by exploiting an unrestricted file upload weakness (CWE-434) in the Microsoft Devices Pricing Program, which fails to properly validate uploaded file types. The vulnerability requires no user interaction and has ...",
+    "expected_category": "Patch/Security Update",
+    "expected_cyber": true
+  },
+  {
+    "title": "Fortinet Security Update - Patch for Multiple Vulnerabilities That Enable Malicious Command Execution - CybersecurityNews",
+    "content": "",
+    "expected_category": "Patch/Security Update",
+    "expected_cyber": true
+  },
+  {
+    "title": "March Patch Tuesday: Three high severity holes in Microsoft Office - csoonline.com",
+    "content": "",
+    "expected_category": "Patch/Security Update",
+    "expected_cyber": true
+  },
+  {
+    "title": "Op-Ed: Microsoft Patch Tuesday reveals 77 vulnerabilities - cybersecurityconnect.com.au",
+    "content": "",
+    "expected_category": "Patch/Security Update",
+    "expected_cyber": true
+  },
+  {
+    "title": "Huntress Snags Over 40 Leader Badges in G2 Spring 2024 Reports | Huntress",
+    "content": "",
+    "expected_category": "Noise",
+    "expected_cyber": false
+  },
+  {
+    "title": "NERC CIP Training Requirements | Huntress",
+    "content": "",
+    "expected_category": "Noise",
+    "expected_cyber": false
+  },
+  {
+    "title": "9 Pro Tips for Better Endpoint Security | Huntress",
+    "content": "",
+    "expected_category": "Noise",
+    "expected_cyber": false
+  },
+  {
+    "title": "Will Patients's Data Ever Be Safe if We Let GPTs Into Healthcare? | Huntress",
+    "content": "",
+    "expected_category": "Noise",
+    "expected_cyber": false
+  },
+  {
+    "title": "North Finchley school launches cyber security club - Barnet Post",
+    "content": "",
+    "expected_category": "Noise",
+    "expected_cyber": false
+  },
+  {
+    "title": "CommVault Systems launches SHIFTMadrid2026 event focused on cybersecurity and AI - Traders Union",
+    "content": "",
+    "expected_category": "Noise",
+    "expected_cyber": false
+  },
+  {
+    "title": "Fynite Launches Autonomous Self-Healing AI Agents for IT and Cybersecurity - GlobeNewswire",
+    "content": "",
+    "expected_category": "Noise",
+    "expected_cyber": false
+  },
+  {
+    "title": "Markets/Coverages: Coalition Provides Expended Cyber Protection in Canada - Insurance Journal",
+    "content": "",
+    "expected_category": "Noise",
+    "expected_cyber": false
+  },
+  {
+    "title": "Leonardo continues to strengthen its cybersecurity sector with the acquisition of Becrypt in the UK - Leonardo S.p.A.",
+    "content": "",
+    "expected_category": "Noise",
+    "expected_cyber": false
+  },
+  {
+    "title": "AI and quantum computing reshape the global cybersecurity landscape - Digital Watch Observatory",
+    "content": "",
+    "expected_category": "Noise",
+    "expected_cyber": false
+  },
+  {
+    "title": "Cyberattaques massives : le groupe Handala frappe VeriFone et Stryker - Mediaterranee.com",
+    "content": "",
+    "expected_category": "Nation-State Attack",
+    "expected_cyber": true
+  },
+  {
+    "title": "Cyberattaque contre un centre de recherche nucléaire en Pologne, Varsovie blâme l'Iran - Le Figaro",
+    "content": "",
+    "expected_category": "Critical Infrastructure Attack",
+    "expected_cyber": true
+  },
+  {
+    "title": "Cyberattaque contre Bell Ambulance : les données de 237 830 patients exposées - europe-infos.fr",
+    "content": "",
+    "expected_category": "Data Breach",
+    "expected_cyber": true
+  }
+]

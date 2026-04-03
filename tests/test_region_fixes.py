@@ -98,9 +98,9 @@ class TestCollapseRegions:
         result = _collapse_regions({"US", "Europe"})
         assert "US" in result and "Europe" in result
 
-    def test_three_regions_kept(self):
-        result = _collapse_regions({"US", "Europe", "APAC"})
-        assert len(result.split(",")) == 3
+    def test_three_regions_collapse_to_global(self):
+        # 3 regions exceeds max 2 threshold — collapses to Global
+        assert _collapse_regions({"US", "Europe", "APAC"}) == "Global"
 
     def test_four_regions_collapse_to_global(self):
         assert _collapse_regions({"US", "Europe", "APAC", "LATAM"}) == "Global"

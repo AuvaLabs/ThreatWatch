@@ -151,12 +151,39 @@ def log_health_summary() -> None:
     suspect = len(report.get("suspect", []))
     stale   = len(report.get("stale", []))
     ok      = len(report.get("ok", []))
+    error   = len(report.get("error", []))
     if dead or suspect or stale:
         logger.warning(
-            f"Feed health — ok:{ok} stale:{stale} suspect:{suspect} dead:{dead}"
+            f"Feed health — ok:{ok} error:{error} stale:{stale} suspect:{suspect} dead:{dead}"
         )
+        for entry in report.get("dead", []):
+            logger.warning(f"  DEAD: {entry.get('url', '?')[:70]}")
+        for entry in report.get("suspect", []):
+            logger.warning(f"  SUSPECT: {entry.get('url', '?')[:70]}")
     else:
         logger.info(f"Feed health — all {ok} feeds ok")
+
+
+def get_health_json() -> dict:
+    """Return health data as a JSON-serializable dict for the API."""
+    report = get_report()
+    return {
+        "total_tracked": sum(len(v) for v in report.values()),
+        "ok": len(report.get("ok", [])),
+        "error": len(report.get("error", [])),
+        "suspect": len(report.get("suspect", [])),
+        "dead": len(report.get("dead", [])),
+        "stale": len(report.get("stale", [])),
+        "dead_feeds": [
+            {"url": e.get("url", ""), "errors": e.get("consecutive_errors", 0),
+             "last_success": str(e.get("last_success", "never"))[:10]}
+            for e in report.get("dead", [])
+        ],
+        "suspect_feeds": [
+            {"url": e.get("url", ""), "errors": e.get("consecutive_errors", 0)}
+            for e in report.get("suspect", [])
+        ],
+    }
 
 
 def print_report() -> None:
