@@ -30,6 +30,10 @@ from modules.webhook import dispatch as webhook_dispatch
 from modules.watchlist_monitor import tag_articles_with_vendors, run_watchlist_monitor
 from modules.newsapi_fetcher import fetch_newsapi_articles
 from modules.region_inferrer import infer_articles_regions
+from modules.nvd_fetcher import fetch_nvd_cves
+from modules.epss_enricher import enrich_articles_with_epss
+from modules.attack_tagger import tag_articles_with_attack
+from modules.trend_detector import update_trends
 
 
 def enrich_articles(articles, summarize=False, stats=None):
@@ -126,6 +130,15 @@ def main():
     except Exception as e:
         logging.warning(f"NewsAPI fetch failed: {e}")
 
+    # NVD CVE monitoring (zero cost — public API)
+    try:
+        nvd_articles = fetch_nvd_cves()
+        if nvd_articles:
+            raw_articles.extend(nvd_articles)
+            logging.info(f"NVD: added {len(nvd_articles)} high/critical CVEs")
+    except Exception as e:
+        logging.warning(f"NVD CVE fetch failed: {e}")
+
     # Watchlist monitor — custom brand/asset keywords (self-hosted only)
     try:
         watchlist_articles = run_watchlist_monitor()
@@ -154,6 +167,25 @@ def main():
     enriched_articles = tag_articles_with_vendors(enriched_articles)
     # Refine region assignments using content-based inference
     enriched_articles = infer_articles_regions(enriched_articles)
+
+    # EPSS exploit prediction scores for CVE-containing articles
+    try:
+        enriched_articles = enrich_articles_with_epss(enriched_articles)
+    except Exception as e:
+        logging.warning(f"EPSS enrichment failed: {e}")
+
+    # MITRE ATT&CK technique tagging
+    try:
+        enriched_articles = tag_articles_with_attack(enriched_articles)
+    except Exception as e:
+        logging.warning(f"ATT&CK tagging failed: {e}")
+
+    # Trend detection — update keyword/category frequency tracking
+    try:
+        update_trends(enriched_articles)
+    except Exception as e:
+        logging.warning(f"Trend detection failed: {e}")
+
     stats.articles_enriched = len(enriched_articles)
     if not enriched_articles:
         logging.info("No cyberattack-related articles after enrichment.")

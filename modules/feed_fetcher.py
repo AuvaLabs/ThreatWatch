@@ -16,6 +16,37 @@ from modules.url_resolver import resolve_original_url, is_clearnet_url
 from modules.feed_health import record_fetch
 from modules.deduplicator import normalize_url
 
+def _parse_article_date(date_str: str) -> datetime | None:
+    """Parse article date from various formats (RFC 2822, ISO 8601, etc.)."""
+    if not date_str:
+        return None
+    # Try RFC 2822 (e.g., "Mon, 14 Mar 2026 12:00:00 GMT")
+    try:
+        dt = parsedate_to_datetime(date_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except (ValueError, TypeError):
+        pass
+    # Try ISO 8601 (e.g., "2026-03-14T12:00:00Z", "2026-03-14T12:00:00+00:00")
+    try:
+        cleaned = date_str.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(cleaned)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except (ValueError, TypeError):
+        pass
+    # Try bare date formats (e.g., "2026-03-14 12:00:00")
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d"):
+        try:
+            dt = datetime.strptime(date_str[:len(fmt) + 5], fmt)
+            return dt.replace(tzinfo=timezone.utc)
+        except (ValueError, TypeError):
+            continue
+    return None
+
+
 _FEED_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Accept": "application/rss+xml, application/xml, text/xml, */*",
@@ -80,12 +111,18 @@ def _fetch_feed(url: str, region: str = "Global") -> list[dict[str, Any]]:
         for r in results:
             pub = r.get("published", "")
             if pub:
-                try:
-                    pub_dt = parsedate_to_datetime(pub)
+                pub_dt = _parse_article_date(pub)
+                if pub_dt is not None:
                     if pub_dt < cutoff:
                         continue
-                except (ValueError, TypeError):
-                    pass
+                else:
+                    # No parseable date — skip article (prevents historic content leaking in)
+                    logger.debug(f"Unparseable date, skipping: {r.get('title', '')[:60]}")
+                    continue
+            else:
+                # No date at all — skip to prevent undated historic articles
+                logger.debug(f"No date, skipping: {r.get('title', '')[:60]}")
+                continue
             filtered.append(r)
 
         skipped = len(results) - len(filtered)

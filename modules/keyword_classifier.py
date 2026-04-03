@@ -85,9 +85,12 @@ _RULES = [
     {
         "category": "Supply Chain Attack",
         "re": re.compile(
-            r"supply\s*chain\s*(attack|compromise)|third.party\s+breach"
+            r"supply[\s-]*chain\s*(attack|compromise|hack|breach)"
+            r"|supply[\s-]*chain\b.*\b(malicious|exploit|compromise|backdoor|trojan)"
+            r"|third.party\s+breach"
             r"|software\s+update.*compromis|dependency\s+confusion"
-            r"|npm\s+package\s+malicious|pypi\s+malicious|github\s+action\s+compromis",
+            r"|npm\s+(package\s+)?malicious|pypi\s+malicious|github\s+action\s+compromis"
+            r"|open\s+vsx\s+extension|vscode\s+extension.*malicious",
             re.IGNORECASE,
         ),
         "confidence": 87,
@@ -280,6 +283,71 @@ _RULES = [
         ),
         "confidence": 72,
     },
+    # ── Multi-language classification rules ──────────────────────────────
+    # French
+    {
+        "category": "Ransomware",
+        "re": re.compile(
+            r"rançongiciel|rançon\s+numérique|chiffrement\s+des\s+données",
+            re.IGNORECASE,
+        ),
+        "confidence": 88,
+    },
+    {
+        "category": "Data Breach",
+        "re": re.compile(
+            r"fuite\s+de\s+données|données\s+(exposées|volées|compromises)"
+            r"|violation\s+de\s+données|patients?\s+exposée?s",
+            re.IGNORECASE,
+        ),
+        "confidence": 85,
+    },
+    {
+        "category": "Nation-State Attack",
+        "re": re.compile(
+            r"cyberattaques?\s+massives?|attaque\s+étatique"
+            r"|groupe\s+(Handala|APT|Lazarus|Sandworm)",
+            re.IGNORECASE,
+        ),
+        "confidence": 85,
+    },
+    {
+        "category": "Critical Infrastructure Attack",
+        "re": re.compile(
+            r"cyberattaque\s+contre\s+.{0,30}(nucléaire|hôpital|infrastructure|énergie|central)"
+            r"|infrastructure\s+critique\s+.{0,20}(attaque|compromise)",
+            re.IGNORECASE,
+        ),
+        "confidence": 85,
+    },
+    {
+        "category": "General Cyber Threat",
+        "re": re.compile(
+            r"cyberattaque|attaque\s+informatique|piratage\s+informatique"
+            r"|cybercriminel|cybersécurité\s+.{0,20}(attaque|incident|alerte|menace)",
+            re.IGNORECASE,
+        ),
+        "confidence": 72,
+    },
+    # Japanese
+    {
+        "category": "General Cyber Threat",
+        "re": re.compile(
+            r"サイバー攻撃|サイバーセキュリティ|不正アクセス|情報漏[洩えい]"
+            r"|ランサムウェア|フィッシング|マルウェア|脆弱性",
+        ),
+        "confidence": 75,
+    },
+    # German
+    {
+        "category": "General Cyber Threat",
+        "re": re.compile(
+            r"Cyberangriff|Cyberattacke|Hackerangriff|Datenleck"
+            r"|Sicherheitslücke|Ransomware-Angriff|Phishing-Angriff",
+            re.IGNORECASE,
+        ),
+        "confidence": 75,
+    },
 ]
 
 # Noise patterns — match articles that pass the cyber keyword check
@@ -364,7 +432,8 @@ _NOISE_PATTERNS = [
     ),
     # Generic cybersecurity advice / tips (not incident reporting)
     re.compile(
-        r"^(top|best|essential)\s+\d+\s+(tips?|ways?|steps?|practices?|strategies?|tools?)\s+(to|for)\s+(protect|secure|stay|prevent|avoid)"
+        r"\d+\s+(pro\s+)?(tips?|ways?|steps?|practices?|strategies?)\s+(to|for)\s+(protect|secure|stay|prevent|avoid|better)"
+        r"|(top|best|essential)\s+\d+\s+(tips?|ways?|steps?|practices?|strategies?|tools?)\s+(to|for)\s+(protect|secure|stay|prevent|avoid)"
         r"|how\s+to\s+(protect|secure|stay\s+safe)\s+(your|against|from)\s+.{0,40}(cyber|hack|threat|attack|phish)"
         r"|(protect|secure)\s+your(self|business|company|organization)\s+(from|against)\s+(cyber|hack|ransomware|phishing)"
         r"|cybersecurity\s+awareness\s+(month|week|day|tips?|best\s+practices?)",
@@ -399,7 +468,41 @@ _NOISE_PATTERNS = [
     # Insurance / market commentary (not incidents)
     re.compile(
         r"cyber\s+insurance\s+(market|premium|rate|cost|trend|outlook)"
-        r"|insurance\s+.*cyber\s+(risk|coverage|policy)",
+        r"|insurance\s+.*cyber\s+(risk|coverage|policy|protection)"
+        r"|\bcyber\s+protection\s+in\b",
+        re.IGNORECASE,
+    ),
+    # Acquisitions / business expansion (not threat intel)
+    re.compile(
+        r"(acquires?|acquisition)\s+.{0,40}(cyber|security)"
+        r"|strengthen.{0,20}(cyber|security)\s+sector"
+        r"|expand.{0,20}(cyber|security)\s+(capabilities|portfolio|offerings)",
+        re.IGNORECASE,
+    ),
+    # Product/platform launches (not threat intel)
+    re.compile(
+        r"launches?\s+.{0,30}(autonomous|self.healing|AI.powered)\s+.{0,20}(agents?|platform|solution)"
+        r"|launches?\s+.{0,30}(event|conference|summit)\s+(focused|dedicated)"
+        r"|launches?\s+.{0,30}(cyber\s*security|security)\s+(club|program|initiative|academy)",
+        re.IGNORECASE,
+    ),
+    # Landscape/trend opinion pieces (not threat intel)
+    re.compile(
+        r"(reshape|reshaping|transform|shaping)\s+(the\s+)?(global\s+)?(cyber\s*security|security)\s+landscape"
+        r"|state\s+of\s+(the\s+)?(cyber\s*security|security)\s+(market|industry|sector)"
+        r"|(cyber\s*security|security)\s+spending\s+(trends?|forecast|outlook|in\s+\w+$)",
+        re.IGNORECASE,
+    ),
+    # Government cyber strategy/policy (not incidents)
+    re.compile(
+        r"(govt|government)\s+(adopts?|announces?|unveils?)\s+.{0,30}(cyber|security)\s+(strategy|policy|plan)"
+        r"|convene\s+.{0,20}(cyber|security)\s+conference",
+        re.IGNORECASE,
+    ),
+    # Risk assessment commentary (not actual incidents)
+    re.compile(
+        r"(entities|organizations?|companies)\s+face\s+(heightened|increased|growing)\s+cyber\s+risk"
+        r"|cyber\s+(risk|threat)\s+(related\s+to|from|amid)",
         re.IGNORECASE,
     ),
 ]
@@ -414,13 +517,37 @@ _CYBER_KEYWORDS = re.compile(
     r"|patch\s+tuesday|critical\s+vuln|backdoor|credential"
     r"|authentication|encryption|firewall|endpoint\s+security"
     r"|soc\s+|siem|penetration\s+test|bug\s+bounty|dark\s+web"
-    r"|rootkit|spyware|keylogger|wiper|cryptojack",
+    r"|rootkit|spyware|keylogger|wiper|cryptojack"
+    # French
+    r"|cyberattaque|piratage|rançongiciel|fuite\s+de\s+données"
+    # Japanese
+    r"|サイバー攻撃|不正アクセス|情報漏|ランサムウェア|フィッシング|マルウェア|脆弱性"
+    # German
+    r"|Cyberangriff|Cyberattacke|Hackerangriff|Datenleck|Sicherheitslücke",
     re.IGNORECASE,
 )
 
 
+# Categories that indicate a specific actor/context — these should win over
+# generic technique categories (Malware, Zero-Day) when both match.
+_CONTEXT_PRIORITY = {
+    "Nation-State Attack": 15,
+    "Supply Chain Attack": 12,
+    "Critical Infrastructure Attack": 12,
+    "Cyber Espionage": 10,
+    "Ransomware": 8,
+    "Data Breach": 5,
+    "Patch/Security Update": 5,
+    "Phishing": 3,
+}
+
+
 def classify_article(title, content=None, source_language="en"):
-    """Classify an article using keyword patterns. Zero API cost.
+    """Classify an article using keyword patterns with multi-match scoring.
+
+    All matching rules are collected. The winner is chosen by:
+    1. Context-priority bonus (actor/campaign > technique)
+    2. Base confidence from the rule
 
     Returns same dict structure as ai_engine.analyze_article for compatibility.
     """
@@ -433,17 +560,24 @@ def classify_article(title, content=None, source_language="en"):
 
     text = title + " " + (content or "")
 
-    # Classify by first matching rule
-    category = "General Cyber Threat"
-    confidence = 60
-    rule_matched = False
-
+    # Collect ALL matching rules (not just the first)
+    matches = []
     for rule in _RULES:
         if rule["re"].search(text):
-            category = rule["category"]
-            confidence = rule["confidence"]
-            rule_matched = True
-            break
+            priority_bonus = _CONTEXT_PRIORITY.get(rule["category"], 0)
+            score = rule["confidence"] + priority_bonus
+            matches.append((rule["category"], rule["confidence"], score))
+
+    if matches:
+        # Pick the highest-scoring match
+        best = max(matches, key=lambda m: m[2])
+        category = best[0]
+        confidence = best[1]
+        rule_matched = True
+    else:
+        category = "General Cyber Threat"
+        confidence = 60
+        rule_matched = False
 
     # Check if cybersecurity-related (broad keywords OR specific rule match)
     is_cyber = rule_matched or bool(_CYBER_KEYWORDS.search(text))

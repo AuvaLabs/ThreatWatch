@@ -5,9 +5,10 @@
   category: Native
   region: Global
 
-- url: https://www.securityweek.com/feed
-  category: Native
-  region: US
+# SecurityWeek — returns 403 from VPS IP (verified 2026-04-03)
+# - url: https://www.securityweek.com/feed
+#   category: Native
+#   region: US
 
 - url: https://www.darkreading.com/rss.xml
   category: Native
@@ -26,17 +27,19 @@
   region: Global
 
 # Tier 2: Government and institutional
-- url: https://www.cisa.gov/news.xml
-  category: Native
-  region: US
+# CISA news — returns 403 from VPS IP (verified 2026-04-03)
+# - url: https://www.cisa.gov/news.xml
+#   category: Native
+#   region: US
 
 - url: https://www.ncsc.gov.uk/api/1/services/v1/report-rss-feed.xml
   category: Native
   region: UK
 
-- url: https://us-cert.cisa.gov/ncas/alerts.xml
-  category: Native
-  region: US
+# US-CERT alerts — returns 403 from VPS IP (verified 2026-04-03)
+# - url: https://us-cert.cisa.gov/ncas/alerts.xml
+#   category: Native
+#   region: US
 
 # Tier 3: Research and analysis
 - url: https://www.schneier.com/feed/
@@ -169,9 +172,10 @@
 # Lumen Black Lotus Labs feed returned empty (verified 2026-03-14)
 
 # Tier 6: Government & CERT (expanded)
-- url: https://www.cisa.gov/uscert/ics/advisories/advisories.xml
-  category: Native
-  region: US
+# CISA ICS advisories — returns 403 from VPS IP (verified 2026-04-03)
+# - url: https://www.cisa.gov/uscert/ics/advisories/advisories.xml
+#   category: Native
+#   region: US
 
 # CERT-EU — EU institutional CERT security advisories (patched URL found)
 - url: https://cert.europa.eu/publications/security-advisories-rss
@@ -226,9 +230,11 @@
 # VMware (Broadcom) advisories feed retired — no working public RSS available
 
 # Tier 10: CVE & Vulnerability Feeds
-- url: https://github.com/advisories.atom
-  category: Native
-  region: Global
+# GitHub Advisories Atom — returns 406 (requires Accept: application/atom+xml)
+# Replaced with JSON API in future phase
+# - url: https://github.com/advisories.atom
+#   category: Native
+#   region: Global
 
 - url: https://www.tenable.com/blog/feed
   category: Native
@@ -257,17 +263,19 @@
   category: Native
   region: India
 
-- url: https://www.csa.gov.sg/api/alerts-and-advisories/rss
-  category: Native
-  region: Singapore
+# CSA Singapore — returns 404 (verified 2026-04-03)
+# - url: https://www.csa.gov.sg/api/alerts-and-advisories/rss
+#   category: Native
+#   region: Singapore
 
 - url: https://www.cert.ssi.gouv.fr/feed/
   category: Native
   region: France
 
-- url: https://www.bsi.bund.de/SiteGlobals/Functions/RSSFeed/RSSNewsfeed/RSSNewsfeed.xml
-  category: Native
-  region: Germany
+# BSI Germany — returns 404 (verified 2026-04-03)
+# - url: https://www.bsi.bund.de/SiteGlobals/Functions/RSSFeed/RSSNewsfeed/RSSNewsfeed.xml
+#   category: Native
+#   region: Germany
 
 - url: https://www.cccs-cccs.gc.ca/en/rss-feeds/cyber-centre-alerts-advisories.xml
   category: Native
@@ -327,9 +335,10 @@
   category: Native
   region: Global
 
-- url: https://hackread.com/feed/
-  category: Native
-  region: Global
+# Hackread — returns 403 from VPS IP (verified 2026-04-01)
+# - url: https://hackread.com/feed/
+#   category: Native
+#   region: Global
 
 - url: https://darkwebinformer.com/rss/
   category: Native

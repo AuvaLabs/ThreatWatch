@@ -172,12 +172,12 @@ class TestRegionMerging:
         regions = {"US", "EU"}
         assert _collapse_regions(regions) == "EU,US"
 
-    def test_collapse_three_regions(self):
+    def test_collapse_three_regions_gives_global(self):
+        # 3 regions exceeds threshold (max 2) — collapses to Global
         regions = {"US", "EU", "APAC"}
-        result = _collapse_regions(regions)
-        assert result == "APAC,EU,US"
+        assert _collapse_regions(regions) == "Global"
 
-    def test_collapse_more_than_three_regions_gives_global(self):
+    def test_collapse_four_regions_gives_global(self):
         regions = {"US", "EU", "APAC", "LATAM"}
         assert _collapse_regions(regions) == "Global"
 
@@ -185,9 +185,9 @@ class TestRegionMerging:
         assert _collapse_regions(set()) == "Global"
 
     def test_collapse_strips_global_before_counting(self):
-        # "Global" plus 3 real regions → 3 real regions, should NOT collapse
+        # "Global" plus 3 real regions → 3 real regions, exceeds max 2 → Global
         regions = {"Global", "US", "EU", "APAC"}
-        assert _collapse_regions(regions) == "APAC,EU,US"
+        assert _collapse_regions(regions) == "Global"
 
     def test_merge_region_splits_compound_string(self, tmp_path, monkeypatch):
         monkeypatch.setattr("modules.deduplicator.SEEN_HASHES_FILE", tmp_path / "hashes.txt")
@@ -207,12 +207,9 @@ class TestRegionMerging:
         ]
         result = deduplicate_articles(articles)
         assert len(result) == 1
-        # US, EU, APAC = 3 regions → should be merged (not collapsed to Global)
+        # US, EU, APAC = 3 regions → exceeds max 2, collapses to Global
         merged = result[0]["feed_region"]
-        assert "APAC" in merged
-        assert "US" in merged
-        assert "EU" in merged
-        assert merged != "Global"
+        assert merged == "Global"
 
     def test_merge_region_collapses_to_global_when_overflow(self, tmp_path, monkeypatch):
         monkeypatch.setattr("modules.deduplicator.SEEN_HASHES_FILE", tmp_path / "hashes.txt")
