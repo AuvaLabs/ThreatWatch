@@ -108,12 +108,35 @@ def _infer_from_text(title: str, summary: str) -> str | None:
         return title_regions.pop()
 
     if len(title_regions) > 1:
-        # Multiple regions mentioned in title — prefer the target region.
-        # Heuristic: if one region is a known "attacker origin" (Middle East for
-        # Iran, APAC for China/North Korea, Europe for Russia) and the other is
-        # the likely target, prefer the target.
-        attacker_regions = {"Middle East", "APAC", "Europe"}
-        targets = title_regions - attacker_regions
+        # Multiple regions in title — determine if this is an attacker→target pattern.
+        # "North Korean hackers attack US company" → target is US
+        # "Iran cyberattack on European banks" → target is Europe
+        #
+        # Attacker-origin keywords: if the title mentions an actor FROM a region
+        # (e.g., "Chinese hackers", "Iranian-linked"), that region is the origin,
+        # and the OTHER region is the target.
+        _ATTACKER_PATTERNS = [
+            (re.compile(r"(North\s+Korea|Pyongyang|Lazarus|Kimsuky|APT3[78])", re.I), "APAC"),
+            (re.compile(r"(China|Chinese|Beijing|PRC|Volt\s+Typhoon|Salt\s+Typhoon|APT[14]\d)", re.I), "APAC"),
+            (re.compile(r"(Iran|Iranian|Tehran|Charming\s+Kitten|MuddyWater|APT3[345])", re.I), "Middle East"),
+            (re.compile(r"(Russia|Russian|Moscow|Kremlin|Fancy\s+Bear|Cozy\s+Bear|APT2[89]|Sandworm)", re.I), "Europe"),
+        ]
+        attacker_origins = set()
+        for pat, origin_region in _ATTACKER_PATTERNS:
+            if pat.search(title):
+                attacker_origins.add(origin_region)
+
+        if attacker_origins:
+            targets = title_regions - attacker_origins
+            if len(targets) == 1:
+                return targets.pop()
+            if len(targets) == 0:
+                # Both regions are attacker origins — return the first non-attacker or Global
+                return "Global"
+
+        # Fallback: generic attacker-region heuristic
+        generic_attacker_regions = {"Middle East", "APAC", "Europe"}
+        targets = title_regions - generic_attacker_regions
         if len(targets) == 1:
             return targets.pop()
         # Can't disambiguate — return Global

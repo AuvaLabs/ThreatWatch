@@ -213,13 +213,19 @@ def main():
     except Exception as e:
         logging.debug(f"Webhook dispatch skipped: {e}")
 
-    # AI briefing + top stories (optional — only runs if LLM API key is set)
+    # AI enrichment (optional — only runs if LLM API key is set)
     try:
-        from modules.briefing_generator import generate_briefing, generate_top_stories
+        from modules.briefing_generator import (
+            generate_briefing, generate_top_stories, summarize_articles,
+        )
+        # Tier 1: Intelligence digest (1x/hour, ~7K tokens)
         generate_briefing(enriched_articles)
+        # Tier 2: Top stories (1x/hour, ~5K tokens)
         generate_top_stories(enriched_articles)
+        # Tier 3: Article summaries (up to 30/run, ~3K tokens per batch)
+        summarize_articles(enriched_articles)
     except Exception as e:
-        logging.debug(f"AI briefing skipped: {e}")
+        logging.debug(f"AI enrichment skipped: {e}")
 
     stats.finalize()
 
