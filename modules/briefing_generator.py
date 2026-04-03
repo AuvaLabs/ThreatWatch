@@ -26,11 +26,45 @@ from urllib3.util.retry import Retry
 
 from modules.config import (
     LLM_API_KEY, LLM_BASE_URL, LLM_MODEL, LLM_PROVIDER,
-    ANTHROPIC_API_KEY, MAX_CONTENT_CHARS, OUTPUT_DIR,
+    LLM_API_KEYS, ANTHROPIC_API_KEY, MAX_CONTENT_CHARS, OUTPUT_DIR,
 )
 from modules.ai_cache import get_cached_result, cache_result
 
 BRIEFING_PATH = OUTPUT_DIR / "briefing.json"
+
+# Smart key rotation: try primary, failover on 429/rate-limit
+_key_index_path = OUTPUT_DIR / ".llm_key_index"
+
+
+def _next_api_key() -> str:
+    """Return the next API key using smart rotation.
+
+    Strategy: rotate through keys evenly so each key gets ~equal daily load.
+    On rate-limit (429), the caller retries with the next key via _call_with_fallback.
+    """
+    if len(LLM_API_KEYS) <= 1:
+        return LLM_API_KEY
+    try:
+        idx = int(_key_index_path.read_text().strip()) if _key_index_path.exists() else 0
+    except (ValueError, OSError):
+        idx = 0
+    key = LLM_API_KEYS[idx % len(LLM_API_KEYS)]
+    try:
+        _key_index_path.parent.mkdir(parents=True, exist_ok=True)
+        _key_index_path.write_text(str((idx + 1) % len(LLM_API_KEYS)))
+    except OSError:
+        pass
+    logger.info(f"Using API key {idx % len(LLM_API_KEYS) + 1} of {len(LLM_API_KEYS)}")
+    return key
+
+
+def _advance_key() -> None:
+    """Advance to next key (called on rate-limit to skip exhausted key)."""
+    try:
+        idx = int(_key_index_path.read_text().strip()) if _key_index_path.exists() else 0
+        _key_index_path.write_text(str((idx + 1) % len(LLM_API_KEYS)))
+    except (ValueError, OSError):
+        pass
 _LAST_API_CALL_PATH = OUTPUT_DIR / ".briefing_last_call"
 _BRIEFING_COOLDOWN_SECONDS = 3600  # 1 hour minimum between API calls
 
@@ -245,28 +279,49 @@ def _get_http_session() -> requests.Session:
     return session
 
 
-def _call_openai_compatible(user_content: str) -> str:
-    """Call any OpenAI-compatible API using requests with retry."""
+def _call_openai_compatible(user_content: str, system_prompt: str = None,
+                            max_tokens: int = 2000) -> str:
+    """Call any OpenAI-compatible API with smart key failover on rate limits."""
     url = f"{LLM_BASE_URL.rstrip('/')}/chat/completions"
     payload = {
         "model": LLM_MODEL,
-        "max_tokens": 2000,
+        "max_tokens": max_tokens,
         "temperature": 0.3,
         "messages": [
-            {"role": "system", "content": _BRIEFING_PROMPT},
+            {"role": "system", "content": system_prompt or _BRIEFING_PROMPT},
             {"role": "user", "content": user_content},
         ],
     }
 
-    headers = {"Content-Type": "application/json"}
-    if LLM_API_KEY:
-        headers["Authorization"] = f"Bearer {LLM_API_KEY}"
+    # Try each key until one works (handles 429 rate limits)
+    attempts = min(len(LLM_API_KEYS), 3) if len(LLM_API_KEYS) > 1 else 1
+    last_error = None
+    for attempt in range(attempts):
+        api_key = _next_api_key()
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
 
-    session = _get_http_session()
-    resp = session.post(url, json=payload, headers=headers, timeout=90)
-    resp.raise_for_status()
-    data = resp.json()
-    return data["choices"][0]["message"]["content"].strip()
+        try:
+            session = _get_http_session()
+            resp = session.post(url, json=payload, headers=headers, timeout=90)
+            if resp.status_code == 429:
+                logger.warning(f"Key {attempt + 1} rate-limited (429), trying next key...")
+                _advance_key()
+                last_error = f"429 rate limit on key {attempt + 1}"
+                continue
+            resp.raise_for_status()
+            data = resp.json()
+            return data["choices"][0]["message"]["content"].strip()
+        except requests.exceptions.HTTPError as e:
+            if e.response is not None and e.response.status_code == 429:
+                logger.warning(f"Key {attempt + 1} rate-limited, trying next...")
+                _advance_key()
+                last_error = str(e)
+                continue
+            raise
+
+    raise RuntimeError(f"All {attempts} API keys exhausted: {last_error}")
 
 
 def _call_anthropic(user_content: str) -> str:
@@ -455,6 +510,147 @@ def load_briefing() -> dict[str, Any] | None:
         return None
     try:
         with open(BRIEFING_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return None
+
+
+# --- Top Stories: AI-curated most significant incidents ---
+
+_TOP_STORIES_PATH = OUTPUT_DIR / "top_stories.json"
+_TOP_STORIES_COOLDOWN = 3600  # 1 hour
+_LAST_TOP_STORIES_PATH = OUTPUT_DIR / ".top_stories_last_call"
+
+_TOP_STORIES_PROMPT = """You are a cyber threat intelligence editor selecting the most significant incidents for a security team's daily briefing. Your job: cut through the noise and surface what actually matters.
+
+SELECTION CRITERIA (in order of priority):
+1. Active exploitation of vulnerabilities (especially with high EPSS scores)
+2. Major breaches affecting large organizations or critical infrastructure
+3. Nation-state campaigns with new TTPs or targets
+4. Ransomware attacks on critical services (healthcare, utilities, government)
+5. Supply chain compromises affecting widely-used software
+6. Novel attack techniques or malware families emerging
+
+RULES:
+- Select exactly 5-8 stories — no more, no less
+- Each summary must be 1-2 sentences explaining WHAT happened and WHY it matters
+- Do NOT select generic cybersecurity news, opinion pieces, market reports, or vendor announcements
+- If two articles cover the same incident, pick the one with more detail
+- Include the article number [N] from the input so we can link back to the source
+
+Respond ONLY with valid JSON (no markdown, no code fences):
+{
+  "top_stories": [
+    {
+      "article_index": <number from [N] in input>,
+      "headline": "<concise headline, max 100 chars>",
+      "summary": "<1-2 sentences: what happened + why it matters>",
+      "significance": "CRITICAL|HIGH|MODERATE",
+      "category": "<threat category>"
+    }
+  ]
+}"""
+
+
+def generate_top_stories(articles: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
+    """Generate AI-curated top stories from the article collection.
+
+    Uses a separate rate limit and cache from the main briefing.
+    Returns a list of top story dicts or None.
+    """
+    provider = _detect_provider()
+    if not provider or provider == "anthropic":
+        return None  # Only use Groq/OpenAI-compatible for this
+
+    if not articles or len(articles) < 10:
+        return None
+
+    digest = _build_digest(articles)
+    cache_key = "topstories_" + hashlib.sha256(digest.encode()).hexdigest()
+
+    cached = get_cached_result(cache_key)
+    if cached is not None:
+        logger.info("Top stories loaded from cache.")
+        _save_top_stories(cached)
+        return cached
+
+    # Rate limit check
+    try:
+        if _LAST_TOP_STORIES_PATH.exists():
+            last_ts = float(_LAST_TOP_STORIES_PATH.read_text().strip())
+            elapsed = datetime.now(timezone.utc).timestamp() - last_ts
+            if elapsed < _TOP_STORIES_COOLDOWN:
+                existing = load_top_stories()
+                if existing:
+                    return existing
+                return None
+    except (ValueError, OSError):
+        pass
+
+    now = datetime.now(timezone.utc)
+    user_content = (
+        f"DATE: {now.strftime('%Y-%m-%d %H:%M UTC')}\n"
+        f"TOTAL ARTICLES: {len(articles)}\n\n"
+        f"BEGIN ARTICLES:\n{digest}\nEND ARTICLES"
+    )
+
+    try:
+        reply = _call_openai_compatible(
+            user_content,
+            system_prompt=_TOP_STORIES_PROMPT,
+            max_tokens=1500,
+        )
+        result = _parse_json(reply)
+        if not result or "top_stories" not in result:
+            logger.warning("Failed to parse top stories response.")
+            return None
+
+        stories = result["top_stories"]
+
+        # Enrich with source article data
+        for story in stories:
+            idx = story.get("article_index", 0) - 1  # 1-indexed in prompt
+            if 0 <= idx < len(articles):
+                src = articles[idx]
+                story["link"] = src.get("link", "")
+                story["source_name"] = src.get("source_name", "")
+                story["published"] = src.get("published", "")
+                story["original_title"] = src.get("title", "")
+
+        story_data = {
+            "stories": stories,
+            "generated_at": now.isoformat(),
+            "articles_analyzed": min(len(articles), _MAX_DIGEST_ARTICLES),
+            "provider": f"{provider}/{LLM_MODEL}",
+        }
+
+        # Record and cache
+        try:
+            _LAST_TOP_STORIES_PATH.parent.mkdir(parents=True, exist_ok=True)
+            _LAST_TOP_STORIES_PATH.write_text(str(now.timestamp()))
+        except OSError:
+            pass
+        cache_result(cache_key, story_data)
+        _save_top_stories(story_data)
+        logger.info(f"Top stories generated: {len(stories)} stories selected.")
+        return story_data
+
+    except Exception as e:
+        logger.error(f"Top stories generation failed: {e}")
+        return None
+
+
+def _save_top_stories(data: dict[str, Any]) -> None:
+    _TOP_STORIES_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(_TOP_STORIES_PATH, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+
+
+def load_top_stories() -> dict[str, Any] | None:
+    if not _TOP_STORIES_PATH.exists():
+        return None
+    try:
+        with open(_TOP_STORIES_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
     except (json.JSONDecodeError, IOError):
         return None

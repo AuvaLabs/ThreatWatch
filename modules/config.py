@@ -19,6 +19,12 @@ LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1")
 LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "auto")  # auto, openai, anthropic, ollama
 
+# Multiple API keys for round-robin rotation (comma-separated in env)
+# Doubles the free-tier budget: 2 keys x 500K tokens/day = 1M tokens/day
+LLM_API_KEYS = [
+    k.strip() for k in os.getenv("LLM_API_KEYS", "").split(",") if k.strip()
+] or ([LLM_API_KEY] if LLM_API_KEY else [])
+
 SITE_DOMAIN = os.getenv("SITE_DOMAIN", "threatwatch.auvalabs.com")
 SITE_URL = f"https://{SITE_DOMAIN}"
 

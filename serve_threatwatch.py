@@ -122,6 +122,16 @@ def load_briefing():
         return None
 
 
+def load_top_stories():
+    """Load AI-curated top stories."""
+    path = BASE_DIR / "data" / "output" / "top_stories.json"
+    try:
+        raw = read_cached(path)
+        return json.loads(raw)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+
+
 _SERVER_START = time.time()
 
 
@@ -212,6 +222,7 @@ def build_ssr_data():
         articles = load_articles()
         stats = load_stats()
         briefing = load_briefing()
+        top_stories = load_top_stories()
 
         # Strip full_content from SSR payload to reduce page size
         # (full_content is only needed for article detail view via API)
@@ -224,6 +235,7 @@ def build_ssr_data():
             "articles": ssr_articles,
             "stats": stats,
             "briefing": briefing,
+            "top_stories": top_stories,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -267,6 +279,10 @@ def load_ioc_items() -> list:
 STATIC_ROUTES = {
     "/api/briefing": {
         "file": BASE_DIR / "data" / "output" / "briefing.json",
+        "content_type": "application/json; charset=utf-8",
+    },
+    "/api/top-stories": {
+        "file": BASE_DIR / "data" / "output" / "top_stories.json",
         "content_type": "application/json; charset=utf-8",
     },
     "/api/stats": {
