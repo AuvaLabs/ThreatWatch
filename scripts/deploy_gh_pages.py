@@ -15,6 +15,10 @@ HTML_SRC = BASE_DIR / "threatwatch.html"
 FAVICON_SRC = BASE_DIR / "favicon.svg"
 DATA_FILE = BASE_DIR / "data" / "output" / "daily_latest.json"
 STATS_FILE = BASE_DIR / "data" / "output" / "run_stats.json"
+BRIEFING_FILE = BASE_DIR / "data" / "output" / "briefing.json"
+TOP_STORIES_FILE = BASE_DIR / "data" / "output" / "top_stories.json"
+CLUSTERS_FILE = BASE_DIR / "data" / "output" / "clusters.json"
+PROFILES_FILE = BASE_DIR / "data" / "output" / "actor_profiles.json"
 SSR_PLACEHOLDER = "<!-- __SSR_DATA__ -->"
 
 
@@ -26,15 +30,33 @@ def load_json(path):
 
 
 def build_ssr_html():
-    """Build static HTML with embedded article data."""
+    """Build static HTML with embedded article + AI data."""
     html = HTML_SRC.read_text()
 
     articles = load_json(DATA_FILE) or []
     stats = load_json(STATS_FILE)
+    briefing = load_json(BRIEFING_FILE)
+    top_stories = load_json(TOP_STORIES_FILE)
+    clusters = load_json(CLUSTERS_FILE)
+    actor_profiles = load_json(PROFILES_FILE)
+
+    # Strip full_content to reduce page size
+    articles = [
+        {k: v for k, v in a.items() if k != "full_content"}
+        for a in articles
+    ]
 
     ssr_payload = {"articles": articles}
     if stats:
         ssr_payload["stats"] = stats
+    if briefing:
+        ssr_payload["briefing"] = briefing
+    if top_stories:
+        ssr_payload["top_stories"] = top_stories
+    if clusters:
+        ssr_payload["clusters"] = clusters
+    if actor_profiles:
+        ssr_payload["actor_profiles"] = actor_profiles
 
     raw_json = json.dumps(ssr_payload, separators=(",", ":"))
     safe_json = raw_json.replace("</", "<\\/")
