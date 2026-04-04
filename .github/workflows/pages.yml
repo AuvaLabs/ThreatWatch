@@ -21,8 +21,12 @@ jobs:
       - name: Fetch live data from VPS
         run: |
           mkdir -p data/output
-          curl -sf https://threatwatch.auvalabs.com/api/articles -o data/output/daily_latest.json || echo '[]' > data/output/daily_latest.json
-          curl -sf https://threatwatch.auvalabs.com/api/stats   -o data/output/run_stats.json    || true
+          curl -sf https://threatwatch.auvalabs.com/api/articles    -o data/output/daily_latest.json  || echo '[]' > data/output/daily_latest.json
+          curl -sf https://threatwatch.auvalabs.com/api/stats       -o data/output/run_stats.json     || true
+          curl -sf https://threatwatch.auvalabs.com/api/briefing    -o data/output/briefing.json      || true
+          curl -sf https://threatwatch.auvalabs.com/api/top-stories -o data/output/top_stories.json   || true
+          curl -sf https://threatwatch.auvalabs.com/api/clusters    -o data/output/clusters.json      || true
+          curl -sf https://threatwatch.auvalabs.com/api/actor-profiles -o data/output/actor_profiles.json || true
 
       - name: Build static site
         run: python scripts/deploy_gh_pages.py
