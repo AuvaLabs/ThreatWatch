@@ -44,6 +44,7 @@ def build_ssr_html():
     articles = [
         {k: v for k, v in a.items() if k != "full_content"}
         for a in articles
+        if isinstance(a, dict)
     ]
 
     ssr_payload = {"articles": articles}
