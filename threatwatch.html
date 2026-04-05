@@ -2327,15 +2327,11 @@ body.self-hosted-mode .watch-section-desc .sh-only { display: inline; }
       <div class="main-tabs">
         <button class="main-tab active" data-tab="briefing" onclick="switchMainTab('briefing')">INTEL BRIEF</button>
         <button class="main-tab" data-tab="breach" onclick="switchMainTab('breach')">BREACH</button>
-        <button class="main-tab" data-tab="ddos" onclick="switchMainTab('ddos')">DDOS</button>
-        <button class="main-tab" data-tab="phishing" onclick="switchMainTab('phishing')">PHISHING</button>
+        <button class="main-tab" data-tab="exploits" onclick="switchMainTab('exploits')">EXPLOITS</button>
         <button class="main-tab" data-tab="malware" onclick="switchMainTab('malware')">MALWARE</button>
-        <button class="main-tab" data-tab="zero-day" onclick="switchMainTab('zero-day')">ZERO-DAY</button>
-        <button class="main-tab" data-tab="vuln" onclick="switchMainTab('vuln')">VULN</button>
         <button class="main-tab" data-tab="darkweb" onclick="switchMainTab('darkweb')">DARK WEB</button>
         <button class="main-tab" data-tab="ransom" onclick="switchMainTab('ransom')">RANSOMWARE</button>
         <button class="main-tab" data-tab="apt" onclick="switchMainTab('apt')">APT TRACKER</button>
-        <button class="main-tab" data-tab="research" onclick="switchMainTab('research')">RESEARCH</button>
         <button class="main-tab" data-tab="brands" onclick="switchMainTab('brands')">BRANDS</button>
         <button class="main-tab" data-tab="assets" onclick="switchMainTab('assets')">TECH</button>
       </div>
@@ -2962,7 +2958,7 @@ function getRegionItems(items) {
   return items.filter(item => _itemMatchesRegion(item, region));
 }
 
-const _CATEGORY_TABS = new Set(['breach', 'ddos', 'phishing', 'malware', 'zero-day', 'vuln', 'darkweb', 'research']);
+const _CATEGORY_TABS = new Set(['breach', 'exploits', 'malware', 'darkweb']);
 
 function analyzeIntelligence() {
   const allItems = state.newsItems;
@@ -3782,16 +3778,12 @@ function filterMatchesItem(filter, item) {
   // Category filter
   let catMatch = true;
   if (filter !== 'all') {
-    if (filter === 'breach') catMatch = item.cssType === 'breach';
-    else if (filter === 'ransomware') catMatch = item.cssType === 'ransomware';
-    else if (filter === 'ddos') catMatch = item.cssType === 'ddos';
-    else if (filter === 'apt') catMatch = item.cssType === 'apt';
-    else if (filter === 'phishing') catMatch = item.cssType === 'phishing';
-    else if (filter === 'malware') catMatch = item.cssType === 'malware';
-    else if (filter === 'zero-day') catMatch = item.cssType === 'zero-day';
-    else if (filter === 'vuln') catMatch = item.cssType === 'vuln' || item.cssType === 'cve' || item.cssType === 'cisa-kev';
+    if (filter === 'breach') catMatch = item.cssType === 'breach' || item.cssType === 'bec';
+    else if (filter === 'exploits') catMatch = item.cssType === 'zero-day' || item.cssType === 'vuln' || item.cssType === 'cve' || item.cssType === 'cisa-kev';
+    else if (filter === 'malware') catMatch = item.cssType === 'malware' || item.cssType === 'phishing' || item.cssType === 'supply-chain';
     else if (filter === 'darkweb') catMatch = item.isDarkweb === true;
-    else if (filter === 'research') catMatch = item.cssType === 'research';
+    else if (filter === 'ransomware') catMatch = item.cssType === 'ransomware';
+    else if (filter === 'apt') catMatch = item.cssType === 'apt';
   }
   // Severity drilldown from recommended actions
   if (state._actionDrilldown && state._actionDrilldown.type === 'severity') {
@@ -4589,14 +4581,10 @@ async function refreshData() {
 /* CATEGORY TAB META & HERO                                       */
 /* ============================================================= */
 const _CATEGORY_TAB_META = {
-  'breach':   { icon: '\uD83D\uDD13', name: 'Data Breach',       color: 'var(--danger)',   desc: 'Unauthorized access events, exfiltrated records, exposed credentials and database leaks.' },
-  'ddos':     { icon: '\uD83D\uDCA5', name: 'DDoS Attacks',      color: 'var(--warning)',  desc: 'Distributed denial-of-service campaigns targeting infrastructure, services and internet platforms.' },
-  'phishing': { icon: '\uD83C\uDFA3', name: 'Phishing',          color: 'var(--warning)',  desc: 'Social engineering campaigns, credential harvesting, spear-phishing and business email compromise.' },
-  'malware':  { icon: '\uD83E\uDDA0', name: 'Malware',           color: '#ff8c00',         desc: 'Trojans, stealers, loaders, RATs, botnets and malicious code deployed against organisations.' },
-  'zero-day': { icon: '\u26A1',       name: 'Zero-Day Exploits', color: 'var(--danger)',   desc: 'Active exploitation of unpatched vulnerabilities with no public fix — highest attacker leverage.' },
-  'vuln':     { icon: '\uD83D\uDD0D', name: 'Vulnerabilities',   color: 'var(--accent)',   desc: 'CVE disclosures, security advisories, patch releases and CISA KEV catalogue additions.' },
-  'darkweb':  { icon: '\uD83D\uDD76', name: 'Dark Web',          color: 'var(--purple)',   desc: 'Threat actor chatter, marketplace listings, data-for-sale posts and underground forum intelligence.' },
-  'research': { icon: '\uD83D\uDD2C', name: 'Threat Research',   color: 'var(--success)',  desc: 'Security research, new TTP analysis, detection engineering reports and threat intelligence publications.' },
+  'breach':   { icon: '\uD83D\uDD13', name: 'Data Breach',  color: 'var(--danger)',  desc: 'Unauthorized access, exfiltrated records, exposed credentials, database leaks, and account takeover incidents.' },
+  'exploits': { icon: '\u26A1',       name: 'Exploits & Vulnerabilities', color: 'var(--danger)', desc: 'Zero-days under active exploitation, CVE disclosures, security patches, and CISA KEV additions.' },
+  'malware':  { icon: '\uD83E\uDDA0', name: 'Malware & Attack Methods',  color: '#ff8c00',       desc: 'Trojans, stealers, RATs, phishing campaigns, supply chain attacks, and malicious code deployment.' },
+  'darkweb':  { icon: '\uD83D\uDD76', name: 'Dark Web Intel', color: 'var(--purple)', desc: 'ThreatFox IOCs, C2 infrastructure, underground forum intelligence, and threat actor marketplace activity.' },
 };
 
 function renderCategoryHero(tab) {
@@ -4625,7 +4613,7 @@ function renderCategoryHero(tab) {
 function switchMainTab(tab) {
   document.querySelectorAll('.main-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
 
-  const CATEGORY_TABS = ['breach', 'ddos', 'phishing', 'malware', 'zero-day', 'vuln', 'darkweb', 'research'];
+  const CATEGORY_TABS = ['breach', 'exploits', 'malware', 'darkweb'];
   const isCategory = CATEGORY_TABS.includes(tab);
 
   const briefingEl = document.querySelector('.center-content');
