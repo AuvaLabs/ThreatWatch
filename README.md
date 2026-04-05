@@ -78,7 +78,7 @@ AI-powered threat intelligence platform that aggregates 155+ RSS feeds, dark web
 - Region filter buttons with article counts — context banner when filtered
 - Article detail view with IOC extraction (CVEs, IPs, hashes, domains)
 - Watchlist preferences saved to localStorage; self-hosted installs can persist keywords server-side
-- **AI Intelligence Digest** — 5-section briefing: What Happened (24h narrative with source links), What To Do (specific actions), Earlier This Week (catch-up), Outlook (forecast)
+- **AI Intelligence Digest** — 5-section briefing: What Happened (24h narrative with source links), What To Do (specific actions), Earlier This Week (catch-up), Outlook (forecast). **Regional digests** for NA, EMEA, APAC — auto-switches when region selected
 - **Headlines panel** — AI-curated 5-8 most significant incidents from last 72 hours, with cluster-related article badges
 - Auto-generated statistical briefing as fallback (zero cost, no API key needed)
 - **5 switchable themes** — Nightwatch (dark brass), Parchment (light cream), Solarized (default), Arctic (clean blue), Phosphor (retro CRT)
@@ -266,6 +266,9 @@ The server runs on port **8098** by default:
 | `GET` | `/api/articles` | All articles as JSON array |
 | `GET` | `/api/articles?offset=0&limit=20` | Paginated articles |
 | `GET` | `/api/briefing` | AI intelligence digest with source citations |
+| `GET` | `/api/briefing/na` | North America regional digest |
+| `GET` | `/api/briefing/emea` | EMEA regional digest |
+| `GET` | `/api/briefing/apac` | Asia-Pacific regional digest |
 | `GET` | `/api/top-stories` | AI-curated top stories (5-8 per cycle) |
 | `GET` | `/api/clusters` | Incident correlation clusters |
 | `GET` | `/api/actor-profiles` | Threat actor profiles |
