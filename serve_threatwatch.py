@@ -20,6 +20,8 @@ from socketserver import ThreadingMixIn
 from urllib.parse import parse_qs, urlparse
 
 BASE_DIR = Path(__file__).resolve().parent
+
+from modules.briefing_health import check_briefing_freshness
 PORT = int(os.environ.get("PORT", 8098))
 CACHE_TTL = 30  # seconds
 SSR_PLACEHOLDER = "<!-- __SSR_DATA__ -->"
@@ -213,6 +215,16 @@ def build_health() -> bytes:
         "feed_health": feed_summary,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
+    try:
+        freshness = check_briefing_freshness(
+            max_age_hours=float(os.getenv("BRIEFING_STALE_HOURS", "3"))
+        )
+        payload["briefing_stale"] = freshness["stale"]
+        payload["briefing_age_hours"] = round(freshness["age_hours"], 2)
+    except Exception:
+        payload["briefing_stale"] = None
+        payload["briefing_age_hours"] = None
+
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 
 
