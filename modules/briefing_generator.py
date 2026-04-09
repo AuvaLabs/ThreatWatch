@@ -49,23 +49,24 @@ RULES:
 - If EARLIER THIS WEEK data is provided, write a "week_in_review" catching readers up on what they missed
 - "outlook" should project what SPECIFIC developments mean for the next 7-30 days
 
-Respond ONLY with valid JSON (no markdown, no code fences):
+Respond ONLY with valid JSON (no markdown, no code fences). All arrays must use strict JSON — use `[]` for empty arrays, never `[none]`, `[None]`, or `[undefined]`. Use `null` or an empty string for missing string values.
 {
   "threat_level": "CRITICAL|ELEVATED|MODERATE|GUARDED|LOW",
   "assessment_basis": "<1 sentence: WHY this level, citing the key driver>",
   "what_happened": "<4-6 sentence narrative covering the most significant incidents from the last 24 hours. Name actors, victims, CVEs, and attack methods. Weave in trending patterns and vulnerability details rather than listing them separately. Each incident should be distinct — no repetition.>",
-  "what_happened_sources": [<article numbers>],
+  "what_happened_sources": [1, 2, 3],
   "what_to_do": [
     {
       "action": "<specific defensive measure tied to an incident above>",
       "threat": "<which specific incident or CVE this addresses>",
-      "sources": [<article numbers>]
+      "sources": [1, 2]
     }
   ],
-  "week_in_review": "<2-3 sentences on the most significant incidents from days 2-7 that readers should know about. Name specific incidents. Omit if no EARLIER THIS WEEK data provided.>",
-  "week_in_review_sources": [<article numbers if available>],
+  "week_in_review": "<2-3 sentences on the most significant incidents from days 2-7 that readers should know about. Name specific incidents. Use an empty string if no EARLIER THIS WEEK data provided.>",
+  "week_in_review_sources": [1, 2],
   "outlook": "<2-3 sentences: what do these SPECIFIC developments mean for the next 7-30 days? What should defenders prepare for?>"
-}"""
+}
+Every array field (`what_happened_sources`, `what_to_do[].sources`, `week_in_review_sources`) must be a JSON array of integers like `[1, 4, 7]` or an empty array `[]`. Never use the words `none`, `null`, or `undefined` inside an array."""
 
 
 def _detect_provider() -> str | None:

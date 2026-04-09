@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from modules.utils import (
+    extract_json,
     get_current_hour_slug,
     get_month_slug,
     get_today_slug,
@@ -41,6 +42,75 @@ class TestTimeSlugs:
         today = get_today_slug()
         assert month.startswith(year)
         assert today.startswith(month)
+
+
+class TestExtractJson:
+    """Regression tests for LLM JSON sanitization.
+
+    Covers common Groq/OpenAI emission bugs that block briefing generation:
+    bare `none`/`None`/`undefined` tokens, `[none]` for empty arrays, and
+    trailing commas.
+    """
+
+    def test_valid_json_passes_through(self):
+        result = extract_json('{"a": 1, "b": [1, 2]}')
+        assert result == {"a": 1, "b": [1, 2]}
+
+    def test_none_inside_array_becomes_empty(self):
+        # Real failure mode from 2026-04-08: Groq emitted [none] for an empty
+        # sources array, which broke the global Intel Brief for 18 hours.
+        result = extract_json('{"sources": [none]}')
+        assert result == {"sources": []}
+
+    def test_capital_none_inside_array(self):
+        result = extract_json('{"sources": [None]}')
+        assert result == {"sources": []}
+
+    def test_undefined_inside_array(self):
+        result = extract_json('{"sources": [undefined]}')
+        assert result == {"sources": []}
+
+    def test_bare_none_as_value(self):
+        result = extract_json('{"a": none, "b": 1}')
+        assert result == {"a": None, "b": 1}
+
+    def test_trailing_comma_in_array(self):
+        result = extract_json('{"a": [1, 2,]}')
+        assert result == {"a": [1, 2]}
+
+    def test_trailing_comma_in_object(self):
+        result = extract_json('{"a": 1, "b": 2,}')
+        assert result == {"a": 1, "b": 2}
+
+    def test_full_briefing_shape_with_none_array(self):
+        # The exact shape that failed in production
+        text = '''{
+          "threat_level": "ELEVATED",
+          "what_happened": "test",
+          "what_happened_sources": [1, 2, 3],
+          "week_in_review_sources": [none],
+          "outlook": "test"
+        }'''
+        result = extract_json(text)
+        assert result is not None
+        assert result["week_in_review_sources"] == []
+        assert result["what_happened_sources"] == [1, 2, 3]
+
+    def test_json_embedded_in_prose(self):
+        text = 'Here is the answer: {"a": 1} — hope that helps.'
+        assert extract_json(text) == {"a": 1}
+
+    def test_empty_and_none_inputs(self):
+        assert extract_json("") is None
+        assert extract_json(None) is None
+
+    def test_unsalvageable_returns_none(self):
+        assert extract_json("not json at all") is None
+
+    def test_string_containing_the_word_none_is_preserved(self):
+        # Must NOT rewrite `none` inside a string value
+        result = extract_json('{"msg": "there are none left"}')
+        assert result == {"msg": "there are none left"}
 
 
 class TestMakeOutputPath:
