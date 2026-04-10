@@ -285,6 +285,95 @@ class TestGenerateBriefing:
         key_b = hashlib.sha256(digest_b.encode()).hexdigest()
         assert key_a != key_b, "Different article sets must produce different cache keys"
 
+    @patch("modules.briefing_generator._record_api_call")
+    @patch("modules.briefing_generator._is_rate_limited", return_value=False)
+    @patch("modules.briefing_generator._save_briefing")
+    @patch("modules.briefing_generator.cache_result")
+    @patch("modules.briefing_generator.get_cached_result", return_value=None)
+    @patch("modules.briefing_generator._call_openai_compatible")
+    @patch("modules.briefing_generator._detect_provider", return_value="openai")
+    def test_cache_key_changes_when_trailing_week_content_changes(
+        self, _, mock_call, mock_cache_get, mock_cache_set, mock_save, _rl, _rec,
+    ):
+        """Cache key must account for 'earlier this week' articles so the
+        briefing regenerates when older content rolls over, even if the
+        last-24h set is identical between runs.
+        """
+        from datetime import datetime, timezone, timedelta
+
+        now = datetime.now(timezone.utc)
+        recent_ts = (now - timedelta(hours=2)).isoformat()
+        old_ts_a = (now - timedelta(days=5)).isoformat()
+        old_ts_b = (now - timedelta(days=5)).isoformat()
+
+        # Same last-24h articles, different "earlier this week" articles
+        def _fresh():
+            a = _article(title="Breaking Incident Today")
+            a["timestamp"] = recent_ts
+            return a
+
+        recent_shared = [_fresh() for _ in range(5)]
+
+        old_a = _article(title="Week-Old Story A", category="Ransomware")
+        old_a["timestamp"] = old_ts_a
+        old_b = _article(title="Week-Old Story B", category="APT")
+        old_b["timestamp"] = old_ts_b
+
+        mock_call.return_value = json.dumps(_valid_briefing())
+
+        generate_briefing(recent_shared + [old_a])
+        key_a = mock_cache_set.call_args[0][0]
+
+        mock_cache_set.reset_mock()
+        generate_briefing(recent_shared + [old_b])
+        key_b = mock_cache_set.call_args[0][0]
+
+        assert key_a != key_b, (
+            "Cache key must change when 'earlier this week' articles differ, "
+            "otherwise the briefing will serve a stale week_in_review."
+        )
+
+    @patch("modules.briefing_generator._record_api_call")
+    @patch("modules.briefing_generator._is_rate_limited", return_value=False)
+    @patch("modules.briefing_generator._save_briefing")
+    @patch("modules.briefing_generator.cache_result")
+    @patch("modules.briefing_generator.get_cached_result", return_value=None)
+    @patch("modules.briefing_generator._call_openai_compatible")
+    @patch("modules.briefing_generator._detect_provider", return_value="openai")
+    def test_trailing_context_excludes_articles_in_current_briefing(
+        self, _, mock_call, mock_cache_get, mock_cache_set, mock_save, _rl, _rec,
+    ):
+        """Day-2/3 articles pulled into briefing_articles as overflow must
+        not also appear under 'EARLIER THIS WEEK'.
+        """
+        from datetime import datetime, timezone, timedelta
+
+        now = datetime.now(timezone.utc)
+        # Sparse last-24h -> day3 overflow gets promoted into briefing
+        recent = _article(title="Today News")
+        recent["timestamp"] = (now - timedelta(hours=2)).isoformat()
+
+        day2 = _article(title="Two Day Old Story Promoted", category="Phishing")
+        day2["timestamp"] = (now - timedelta(days=2)).isoformat()
+
+        old = _article(title="Five Day Old Story", category="Ransomware")
+        old["timestamp"] = (now - timedelta(days=5)).isoformat()
+
+        mock_call.return_value = json.dumps(_valid_briefing())
+        generate_briefing([recent, day2, old])
+
+        sent_prompt = mock_call.call_args[0][0]
+        # day2 title should appear once (as current incident), not duplicated
+        # under the "earlier this week" notable incidents list
+        earlier_section = sent_prompt.split("EARLIER THIS WEEK", 1)
+        assert len(earlier_section) == 2, "trailing context should be rendered"
+        trailing_block = earlier_section[1]
+        assert "Two Day Old Story Promoted" not in trailing_block, (
+            "articles already in the current briefing must not appear again "
+            "under 'earlier this week'"
+        )
+        assert "Five Day Old Story" in trailing_block
+
 
 # ---------------------------------------------------------------------------
 # load_briefing
