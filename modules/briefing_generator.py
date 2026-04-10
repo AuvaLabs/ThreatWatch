@@ -323,8 +323,12 @@ def generate_briefing(articles: list[dict[str, Any]]) -> dict[str, Any] | None:
         briefing_articles.extend(day3[:30 - len(briefing_articles)])
     briefing_articles = briefing_articles[:_MAX_DIGEST_ARTICLES]
 
-    # Build trailing "this week" context from older articles
-    trailing_articles = day3 + older
+    # Build trailing "this week" context from older articles, excluding
+    # anything already pulled into briefing_articles (day3 overflow).
+    briefing_ids = {id(a) for a in briefing_articles}
+    trailing_articles = [
+        a for a in (day3 + older) if id(a) not in briefing_ids
+    ]
     trailing_context = ""
     if trailing_articles:
         # Quick summary of what happened earlier this week
@@ -339,7 +343,10 @@ def generate_briefing(articles: list[dict[str, Any]]) -> dict[str, Any] | None:
         )
 
     digest = _build_digest(briefing_articles)
-    cache_key = hashlib.sha256(digest.encode()).hexdigest()
+    # Include trailing context in the cache key so the briefing regenerates
+    # when "earlier this week" content changes, even if the last-24h set is
+    # identical between runs.
+    cache_key = hashlib.sha256((digest + trailing_context).encode()).hexdigest()
 
     # Check content cache first
     cached = get_cached_result(cache_key)
