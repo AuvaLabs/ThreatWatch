@@ -198,14 +198,22 @@ def tag_sectors(title: str | None, summary: str | None) -> list[str]:
 def annotate_articles_with_sectors(articles: Iterable[dict]) -> int:
     """Write `victim_sectors` onto each article in place.
 
-    Matches over title + summary + full_content where available. Returns the
-    count of articles that picked up at least one sector.
+    Matches over title + summary where available. We deliberately SKIP
+    full_content for darkweb articles (ransomware-victim aggregator posts,
+    ThreatFox dumps) because their scraped body contains unrelated victim
+    names that cross-contaminate the sector tags — a ransomware-victim post
+    about 'Tax Prep and More' was getting Healthcare + Finance tags from
+    the aggregator page's sidebar, not from the actual victim.
     """
     hits = 0
     for a in articles:
+        is_darkweb = bool(a.get("darkweb") or a.get("isDarkweb"))
+        summary_parts = [a.get("summary")]
+        if not is_darkweb:
+            summary_parts.append(a.get("full_content"))
         sectors = tag_sectors(
             a.get("title"),
-            " ".join(filter(None, [a.get("summary"), a.get("full_content")])),
+            " ".join(filter(None, summary_parts)),
         )
         if sectors:
             a["victim_sectors"] = sectors
