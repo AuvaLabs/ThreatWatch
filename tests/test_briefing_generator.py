@@ -228,18 +228,19 @@ class TestGenerateBriefing:
     @patch("modules.briefing_generator._call_openai_compatible")
     @patch("modules.briefing_generator._detect_provider", return_value="openai")
     def test_legacy_schema_converted(self, _, mock_call, mock_cache_get, mock_save, _rl, _rec):
-        """Legacy responses with executive_summary/recommended_actions are accepted."""
+        """Legacy responses with executive_summary/recommended_actions are accepted
+        and translated into the current what_happened/what_to_do schema."""
         legacy = {
             "threat_level": "ELEVATED",
             "executive_summary": "Legacy summary.",
             "recommended_actions": ["Do thing A", "Do thing B"],
         }
-        mock_call.return_value = json.dumps(legacy)
+        mock_call.return_value = self._mock_reply(legacy)
         result = generate_briefing([_article()])
         assert result is not None
-        assert result["situation_overview"] == "Legacy summary."
-        assert isinstance(result["priority_actions"], list)
-        assert result["priority_actions"][0]["action"] == "Do thing A"
+        assert result["what_happened"] == "Legacy summary."
+        assert isinstance(result["what_to_do"], list)
+        assert result["what_to_do"][0]["action"] == "Do thing A"
 
     @patch("modules.briefing_generator._save_briefing")
     @patch("modules.briefing_generator._call_openai_compatible")

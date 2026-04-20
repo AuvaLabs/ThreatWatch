@@ -282,17 +282,11 @@ def deduplicate_articles(articles: list[dict[str, Any]]) -> list[dict[str, Any]]
     return unique_articles
 
 
-_MAX_MERGED_REGIONS = 2  # collapse to Global if more than 2 distinct regions merge
-
-
-def _collapse_regions(regions: set) -> str:
-    """Return a region string, collapsing to 'Global' if too many regions merged."""
-    regions.discard("Global")
-    if not regions:
-        return "Global"
-    if len(regions) > _MAX_MERGED_REGIONS:
-        return "Global"
-    return ",".join(sorted(regions))
+# Region-collapse helpers now live in modules.regions. These aliases remain
+# for the rare external caller that imported the underscore-prefixed names
+# directly; everything in this codebase uses the public API.
+from modules.regions import MAX_MERGED_REGIONS as _MAX_MERGED_REGIONS
+from modules.regions import collapse_regions as _collapse_regions
 
 
 def _merge_region(original: dict[str, Any], duplicate: dict[str, Any]) -> None:

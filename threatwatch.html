@@ -3465,9 +3465,16 @@ function renderClusters() {
     }
 
     html += `<div style="font-size:10px;color:var(--text-muted)">`;
-    cluster.articles.slice(0, 4).forEach(a => {
+    // Articles are already sorted ascending by publish date (see
+    // modules/incident_correlator._resolve_campaign) so the first entry is
+    // the earliest outlet to cover the story. Promote it visually with a
+    // tiny "FIRST" chip so analysts can attribute the story at a glance.
+    cluster.articles.slice(0, 4).forEach((a, idx) => {
       const link = a.link ? ` href="${escapeHTML(safeHref(a.link))}" target="_blank" rel="noopener"` : '';
-      html += `<div style="margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><a${link} style="color:var(--text-secondary);text-decoration:none">${escapeHTML(a.title)}</a></div>`;
+      const firstChip = idx === 0
+        ? '<span style="display:inline-block;margin-right:4px;padding:0 4px;font-size:8px;background:var(--success);color:white;border-radius:2px;letter-spacing:0.5px">FIRST</span>'
+        : '';
+      html += `<div style="margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${firstChip}<a${link} style="color:var(--text-secondary);text-decoration:none">${escapeHTML(a.title)}</a></div>`;
     });
     if (count > 4) html += `<div style="color:var(--accent)">+ ${count - 4} more</div>`;
     html += `</div></div>`;
