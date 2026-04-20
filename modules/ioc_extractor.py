@@ -108,6 +108,37 @@ _DOMAIN_BLOCKLIST = frozenset({
     "e.g", "i.e", "etc.", "vs.", "fig.",
 })
 
+# Legitimate sites that routinely appear in article bodies as source citations,
+# vendor-advisory links, or brand mentions — not indicators of compromise.
+# Curated from the live distribution: the top 20 extracted domains during the
+# post-deploy validation pass were almost entirely news / vendor / social
+# media sites, which drowned out the real C2 / phishing domains.
+_BENIGN_DOMAINS = frozenset({
+    # News and security media
+    "cyberpress.org", "thehackernews.com", "bleepingcomputer.com",
+    "darkreading.com", "securityweek.com", "scmagazine.com", "scworld.com",
+    "csoonline.com", "techradar.com", "hothardware.com", "socradar.io",
+    "cybersecuritynews.com", "infosecurity-magazine.com", "helpnetsecurity.com",
+    "theregister.com", "the420.in", "marketscreener.com", "01net.com",
+    "wired.com", "ars-technica.com", "arstechnica.com", "cnet.com",
+    "reuters.com", "bloomberg.com", "ft.com", "nytimes.com", "wsj.com",
+    # Advisory / NVD / government
+    "nvd.nist.gov", "cve.mitre.org", "cisa.gov", "ncsc.gov.uk",
+    "advisory.splunk.com", "helpx.adobe.com", "support.microsoft.com",
+    "msrc.microsoft.com", "cert.gov.ua", "cert-fr.cossi.fr",
+    "first.org", "attack.mitre.org", "sans.org", "sans.edu",
+    # Dark-web trackers used as sources by the pipeline itself
+    "ransomware.live", "ransomwatch.net", "threatfox.abuse.ch",
+    "abuse.ch", "malware-traffic-analysis.net", "databreaches.net",
+    # Social and code hosting
+    "x.com", "twitter.com", "t.me", "linkedin.com", "facebook.com",
+    "github.com", "sourceforge.net", "onworks.net",
+    # Ubiquitous vendor brands that appear as mentions, not IOCs
+    "microsoft.com", "google.com", "apple.com", "amazon.com", "aws.amazon.com",
+    "cloudflare.com", "akamai.com", "booking.com", "airbnb.com",
+    "wordpress.com", "medium.com", "youtube.com", "youtu.be", "reddit.com",
+})
+
 # Placeholder IPs that show up in docs, examples, and version strings far
 # more often than as real indicators. Kept intentionally tiny: we don't
 # blocklist 1.1.1.1 / 8.8.8.8 because malware DOES occasionally exfil through
@@ -148,6 +179,13 @@ def _extract_domains(text: str) -> set[str]:
         # Drop emails (already extracted separately; the domain-side of an
         # email is not an IOC on its own in this pipeline).
         if _EMAIL_RE.search(d):
+            continue
+        # Skip benign news / vendor / aggregator domains so the extracted
+        # IOC list is dominated by real malicious indicators rather than
+        # source citations. An eTLD+1 check catches subdomains too
+        # (help.adobe.com -> adobe.com match).
+        etld1 = ".".join(d.split(".")[-2:])
+        if d in _BENIGN_DOMAINS or etld1 in _BENIGN_DOMAINS:
             continue
         out.add(d)
     return out
