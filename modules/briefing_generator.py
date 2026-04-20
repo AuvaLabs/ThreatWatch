@@ -14,6 +14,7 @@ Configure via environment variables:
 import json
 import logging
 import hashlib
+import os
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -887,7 +888,10 @@ def load_top_stories() -> dict[str, Any] | None:
 # --- AI Article Summaries: batch-summarize articles missing summaries ---
 
 _SUMMARY_BATCH_SIZE = 10  # articles per LLM call
-_MAX_SUMMARIES_PER_RUN = 30  # cap per pipeline run to stay within budget
+# Was 30/run which only covered ~2% of the ~1600 articles/run backlog, leaving
+# >50% of the corpus without summaries. Groq's free tier accommodates higher
+# throughput; batches of 10 keep token usage per call predictable.
+_MAX_SUMMARIES_PER_RUN = int(os.environ.get("MAX_SUMMARIES_PER_RUN", "150"))
 
 _SUMMARY_PROMPT = """You are a cyber threat intelligence analyst. For each article, extract key intelligence details in a structured format.
 

@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -8,7 +9,13 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s"
 )
 
-RETENTION_DAYS = 365
+# Archive subdirs (`hourly/`, `daily/`) used to retain 365 days of JSON snapshots
+# despite the live window being 7 days — disk grew unbounded. Cap archives to a
+# reasonable analytics window (default 30 days) and keep non-archive outputs at
+# the original 365 so audit reports and briefings persist.
+ARCHIVE_RETENTION_DAYS = int(os.environ.get("ARCHIVE_RETENTION_DAYS", "30"))
+OUTPUT_RETENTION_DAYS = int(os.environ.get("OUTPUT_RETENTION_DAYS", "365"))
+_ARCHIVE_SUBDIRS = ("hourly", "daily")
 
 
 def cleanup_seen_hashes():
@@ -39,17 +46,23 @@ def cleanup_old_outputs():
     now = datetime.now()
     deleted_count = 0
     for file in OUTPUT_DIR.rglob("*.json"):
-        if file.is_file():
-            mtime = datetime.fromtimestamp(file.stat().st_mtime)
-            if (now - mtime).days > RETENTION_DAYS:
-                try:
-                    file.unlink()
-                    deleted_count += 1
-                    logging.info(f"Deleted old file: {file}")
-                except Exception as e:
-                    logging.error(f"Error deleting {file}: {e}")
+        if not file.is_file():
+            continue
+        in_archive = any(part in _ARCHIVE_SUBDIRS for part in file.relative_to(OUTPUT_DIR).parts)
+        cutoff_days = ARCHIVE_RETENTION_DAYS if in_archive else OUTPUT_RETENTION_DAYS
+        mtime = datetime.fromtimestamp(file.stat().st_mtime)
+        if (now - mtime).days > cutoff_days:
+            try:
+                file.unlink()
+                deleted_count += 1
+                logging.info(f"Deleted old file: {file} (>{cutoff_days}d)")
+            except Exception as e:
+                logging.error(f"Error deleting {file}: {e}")
 
-    logging.info(f"Deleted {deleted_count} old output files.")
+    logging.info(
+        f"Deleted {deleted_count} old output files "
+        f"(archive>{ARCHIVE_RETENTION_DAYS}d, other>{OUTPUT_RETENTION_DAYS}d)."
+    )
 
 
 def cleanup_seen_titles():

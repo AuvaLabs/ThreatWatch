@@ -3264,7 +3264,7 @@ function renderAIBriefing(container) {
       const title = escapeHTML(src.title);
       const name = src.source_name ? escapeHTML(src.source_name) : '';
       const label = name || `Source ${idx}`;
-      return `<a href="${escapeHTML(src.link)}" target="_blank" rel="noopener" title="${title}" style="color:var(--accent);text-decoration:none;font-size:10px">${label}</a>`;
+      return `<a href="${escapeHTML(safeHref(src.link))}" target="_blank" rel="noopener" title="${title}" style="color:var(--accent);text-decoration:none;font-size:10px">${label}</a>`;
     }).filter(Boolean);
     if (!links.length) return '';
     return `<div style="margin-top:4px;font-size:10px;color:var(--text-muted)">&#x1F4CE; ${links.join(' &middot; ')}</div>`;
@@ -3416,7 +3416,7 @@ function renderClusters() {
 
     html += `<div style="font-size:10px;color:var(--text-muted)">`;
     cluster.articles.slice(0, 4).forEach(a => {
-      const link = a.link ? ` href="${escapeHTML(a.link)}" target="_blank" rel="noopener"` : '';
+      const link = a.link ? ` href="${escapeHTML(safeHref(a.link))}" target="_blank" rel="noopener"` : '';
       html += `<div style="margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><a${link} style="color:var(--text-secondary);text-decoration:none">${escapeHTML(a.title)}</a></div>`;
     });
     if (count > 4) html += `<div style="color:var(--accent)">+ ${count - 4} more</div>`;
@@ -3450,7 +3450,7 @@ function renderTopStories() {
     const sig = (story.significance || 'MODERATE').toUpperCase();
     const badge = `<span class="${sigClass(sig)}" style="font-size:9px;letter-spacing:0.5px">${sig}</span>`;
     const catBadge = story.category ? `<span class="b-hl" style="font-size:9px">${escapeHTML(story.category)}</span>` : '';
-    const link = story.link ? ` href="${escapeHTML(story.link)}" target="_blank" rel="noopener"` : '';
+    const link = story.link ? ` href="${escapeHTML(safeHref(story.link))}" target="_blank" rel="noopener"` : '';
     const source = story.source_name ? `<span style="font-size:10px;color:var(--text-muted)"> &mdash; ${escapeHTML(story.source_name)}</span>` : '';
 
     // Check if this story matches a cluster — show related count
@@ -4143,6 +4143,20 @@ function escapeHTML(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+/* Feed-supplied URLs are untrusted. escapeHTML neutralises angle-brackets
+   but does not block javascript:/data:/vbscript: schemes, so an RSS feed can
+   publish <link>javascript:...</link> and XSS any reader who clicks OPEN
+   ARTICLE. Restrict href to http/https/mailto, fall back to '#' otherwise. */
+function safeHref(url) {
+  if (!url) return '#';
+  try {
+    const u = new URL(url, window.location.href);
+    return ['http:', 'https:', 'mailto:'].includes(u.protocol) ? url : '#';
+  } catch (e) {
+    return '#';
+  }
+}
+
 /* ============================================================= */
 /* DETAIL PANEL (RIGHT — on card click)                           */
 /* ============================================================= */
@@ -4203,7 +4217,7 @@ function selectItem(item) {
     <div class="detail-body">${escapeHTML(item.description)}</div>
     ${cveBlock}
     ${renderIOCSection(item)}
-    <a class="detail-open-link" href="${escapeHTML(item.link)}" target="_blank" rel="noopener">OPEN ARTICLE &rarr;</a>
+    <a class="detail-open-link" href="${escapeHTML(safeHref(item.link))}" target="_blank" rel="noopener">OPEN ARTICLE &rarr;</a>
   `;
 
   document.querySelectorAll('.center-section').forEach(s => s.style.display = 'none');
@@ -5412,7 +5426,7 @@ function showWatchDetail(item, backTab) {
       </div>
       <div class="detail-divider"></div>
       <div class="detail-body">${escapeHTML(item.description)}</div>
-      <a class="detail-open-link" href="${escapeHTML(item.link)}" target="_blank" rel="noopener">OPEN ARTICLE &rarr;</a>
+      <a class="detail-open-link" href="${escapeHTML(safeHref(item.link))}" target="_blank" rel="noopener">OPEN ARTICLE &rarr;</a>
     </div>`;
   const mainEl = document.getElementById('main-content');
   if (mainEl) mainEl.scrollTop = 0;

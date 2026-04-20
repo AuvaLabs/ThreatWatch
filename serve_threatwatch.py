@@ -189,6 +189,20 @@ def _annotate_with_clusters(articles: list, clusters_payload: dict | None) -> No
             a["cluster"] = index[h]
 
 
+def _slim_clusters_for_ssr(clusters_payload: dict | None) -> dict | None:
+    """Return a copy of clusters with per-article hash lists stripped.
+
+    `article_hashes` is only needed server-side for the article→cluster join.
+    Shipping it in SSR bloats the HTML by 50-500 strings per cluster.
+    """
+    if not clusters_payload:
+        return clusters_payload
+    trimmed = []
+    for c in clusters_payload.get("clusters") or []:
+        trimmed.append({k: v for k, v in c.items() if k != "article_hashes"})
+    return {**clusters_payload, "clusters": trimmed}
+
+
 def load_actor_profiles():
     """Load threat actor profiles."""
     path = BASE_DIR / "data" / "output" / "actor_profiles.json"
@@ -233,12 +247,49 @@ def save_watchlist_data(brands: list, assets: list) -> None:
         tmp.replace(watchlist_path)
 
 
+_PIPELINE_INTERVAL_S = int(os.environ.get("PIPELINE_INTERVAL", "600"))
+# Status thresholds: last_run older than 2.5x interval = stale; analysis failure
+# rate above this on the most recent run flips the status to degraded.
+_STALE_AFTER_S = _PIPELINE_INTERVAL_S * 2.5 + 60
+_DEGRADED_FAILURE_RATE = 0.30
+
+
+def _compute_status(latest_run: dict, feed_summary: dict, last_run_age: float | None) -> tuple[str, list[str]]:
+    """Decide ok / degraded / stale based on the latest run + feed health.
+
+    Returns (status, reasons). Reasons explain *why* we marked it degraded/stale
+    so operators debugging a red healthcheck don't have to reverse-engineer it.
+    """
+    reasons: list[str] = []
+    if last_run_age is None:
+        return ("unknown", ["no_completed_run_recorded"])
+    if last_run_age > _STALE_AFTER_S:
+        reasons.append(f"last_run_{int(last_run_age)}s_ago_threshold_{int(_STALE_AFTER_S)}s")
+        return ("stale", reasons)
+    if latest_run.get("budget_exceeded"):
+        reasons.append("llm_budget_exceeded_last_run")
+    enriched = latest_run.get("articles_enriched") or 0
+    failures = latest_run.get("analysis_failures") or 0
+    if enriched and failures / max(enriched, 1) >= _DEGRADED_FAILURE_RATE:
+        reasons.append(f"analysis_failure_rate_{failures}/{enriched}")
+    dead_feeds = feed_summary.get("dead", 0) + feed_summary.get("failing", 0)
+    if dead_feeds > 20:
+        reasons.append(f"dead_feeds_{dead_feeds}")
+    return ("degraded" if reasons else "ok", reasons)
+
+
 def build_health() -> bytes:
-    """Build /api/health payload — not cached (always fresh)."""
+    """Build /api/health payload — not cached (always fresh).
+
+    `status` reflects real state:
+      ok      — last run completed within 2.5x pipeline interval, no LLM outage
+      degraded— recent run completed but had LLM budget/failure or many dead feeds
+      stale   — no recent run (pipeline hung or scheduler dead)
+      unknown — no stats file yet
+    """
     stats = load_stats()
     latest_run = stats.get("latest", {})
 
-    # Feed health summary from state file
     feed_summary: dict[str, int] = {}
     feed_health_path = BASE_DIR / "data" / "state" / "feed_health.json"
     try:
@@ -250,12 +301,30 @@ def build_health() -> bytes:
     except (FileNotFoundError, json.JSONDecodeError):
         pass
 
+    completed_at = latest_run.get("completed_at")
+    last_run_age: float | None = None
+    if completed_at:
+        try:
+            dt = datetime.fromisoformat(str(completed_at).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            last_run_age = (datetime.now(timezone.utc) - dt).total_seconds()
+        except (ValueError, TypeError):
+            last_run_age = None
+
+    status, reasons = _compute_status(latest_run, feed_summary, last_run_age)
+
     payload = {
-        "status": "ok",
+        "status": status,
+        "reasons": reasons,
         "uptime_s": int(time.time() - _SERVER_START),
-        "last_run_at": latest_run.get("completed_at"),
+        "last_run_at": completed_at,
+        "last_run_age_s": int(last_run_age) if last_run_age is not None else None,
         "articles_total": latest_run.get("articles_fetched", 0),
         "articles_cyber": latest_run.get("cyber_articles", 0),
+        "articles_enriched": latest_run.get("articles_enriched", 0),
+        "analysis_failures": latest_run.get("analysis_failures", 0),
+        "budget_exceeded": bool(latest_run.get("budget_exceeded", False)),
         "api_cost_today_usd": latest_run.get("api_cost_today", 0),
         "feed_health": feed_summary,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -310,13 +379,17 @@ def build_ssr_data():
             for a in articles
         ]
         _annotate_with_clusters(ssr_articles, clusters)
+        # After article annotation, the hash list inside each cluster is dead
+        # weight in the SSR payload (often 50-500 hashes per cluster). The
+        # frontend cluster panel only needs the display fields.
+        ssr_clusters = _slim_clusters_for_ssr(clusters)
 
         ssr_payload = {
             "articles": ssr_articles,
             "stats": stats,
             "briefing": briefing,
             "top_stories": top_stories,
-            "clusters": clusters,
+            "clusters": ssr_clusters,
             "actor_profiles": actor_profiles,
             "regional_briefings": regional_briefings if regional_briefings else None,
             "generated_at": datetime.now(timezone.utc).isoformat(),
