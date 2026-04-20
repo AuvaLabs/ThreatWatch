@@ -240,6 +240,37 @@ _CAMPAIGN_ID_RE = _re_cve.compile(
 )
 
 
+def _feedback_summary() -> dict:
+    """Aggregate classifier feedback from data/state/feedback.jsonl.
+
+    Returns total submissions and the top flagged correct_category values.
+    Non-fatal: missing or malformed lines are skipped, never raise.
+    """
+    path = BASE_DIR / "data" / "state" / "feedback.jsonl"
+    if not path.exists():
+        return {"total": 0, "top_corrections": []}
+    total = 0
+    cat_counts: dict[str, int] = {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except ValueError:
+                    continue
+                total += 1
+                cc = rec.get("correct_category", "")
+                if cc:
+                    cat_counts[cc] = cat_counts.get(cc, 0) + 1
+    except OSError:
+        return {"total": 0, "top_corrections": []}
+    top = sorted(cat_counts.items(), key=lambda x: -x[1])[:10]
+    return {"total": total, "top_corrections": [{"category": c, "count": n} for c, n in top]}
+
+
 def _enrich_campaign_with_articles(campaign: dict) -> dict:
     """Attach first_reported + per-article metadata to a campaign record.
 
@@ -747,6 +778,54 @@ class ThreatWatchHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
 
+        if path == "/api/feedback":
+            # Classifier feedback — analysts flag misclassified articles so
+            # accuracy can be tracked and keyword patterns tuned. Token-gated
+            # using the same WATCHLIST_TOKEN pattern; token is required in
+            # production to prevent poisoning.
+            if WATCHLIST_TOKEN:
+                auth = self.headers.get("Authorization", "")
+                if auth != f"Bearer {WATCHLIST_TOKEN}":
+                    self._send_error_json(HTTPStatus.UNAUTHORIZED, "Invalid or missing authorization token")
+                    return
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                if length <= 0:
+                    self._send_error_json(HTTPStatus.LENGTH_REQUIRED, "Content-Length required")
+                    return
+                if length > 16384:  # 16 KB max
+                    self._send_error_json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "Payload too large")
+                    return
+                raw = self.rfile.read(length)
+                data = json.loads(raw)
+                article_hash = str(data.get("article_hash", "")).strip()[:128]
+                correct_category = str(data.get("correct_category", "")).strip()[:128]
+                note = str(data.get("note", "")).strip()[:512]
+                if not article_hash or not correct_category:
+                    self._send_error_json(HTTPStatus.BAD_REQUEST, "Missing article_hash or correct_category")
+                    return
+                record = {
+                    "article_hash": article_hash,
+                    "correct_category": correct_category,
+                    "note": note,
+                    "received_at": datetime.now(timezone.utc).isoformat(),
+                    "source_ip": _get_client_ip(self),
+                }
+                feedback_path = BASE_DIR / "data" / "state" / "feedback.jsonl"
+                feedback_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(feedback_path, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                body = json.dumps({"ok": True}).encode()
+            except (json.JSONDecodeError, ValueError):
+                self._send_error_json(HTTPStatus.BAD_REQUEST, "Invalid JSON payload")
+                return
+            except OSError as exc:
+                logger.error("Feedback write failed: %s", exc)
+                self._send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, "Write failed")
+                return
+            self._send_body("application/json; charset=utf-8", body, False)
+            return
+
         if path == "/api/watchlist":
             if not WATCHLIST_WRITE_ENABLED:
                 self._send_error_json(HTTPStatus.FORBIDDEN,
@@ -805,6 +884,63 @@ class ThreatWatchHandler(BaseHTTPRequestHandler):
                 self._send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, "Render error")
                 return
             self._send_body("text/html; charset=utf-8", body, head_only)
+            return
+
+        # Route: /api/since?ts=<iso>&limit=N — incremental feed refresh. Returns
+        # only articles whose `timestamp` (ingest time, not publish time) is
+        # strictly newer than the supplied cursor. Cheap for polling clients
+        # (webhooks, CLI, Slackbot) that currently refetch the whole 7-day
+        # window on every tick.
+        if path == "/api/since":
+            try:
+                from modules.date_utils import parse_datetime
+                qs = parse_qs(parsed.query)
+                ts_raw = (qs.get("ts", [""])[0] or "").strip()
+                limit_raw = (qs.get("limit", ["200"])[0] or "200").strip()
+                try:
+                    limit = max(1, min(int(limit_raw), 1000))
+                except ValueError:
+                    self._send_error_json(HTTPStatus.BAD_REQUEST, "Invalid limit")
+                    return
+                cursor = parse_datetime(ts_raw) if ts_raw else None
+                if ts_raw and cursor is None:
+                    self._send_error_json(HTTPStatus.BAD_REQUEST, "Invalid ts (expected ISO 8601 or RFC 2822)")
+                    return
+
+                articles = load_articles()
+                matched = []
+                newest_ts: datetime | None = None
+                for a in articles:
+                    art_dt = parse_datetime(a.get("timestamp")) or parse_datetime(a.get("published"))
+                    if art_dt is None:
+                        continue
+                    if cursor is not None and art_dt <= cursor:
+                        continue
+                    if newest_ts is None or art_dt > newest_ts:
+                        newest_ts = art_dt
+                    matched.append((art_dt, a))
+
+                matched.sort(key=lambda pair: pair[0], reverse=True)
+                sliced = matched[:limit]
+                payload_articles = [
+                    {k: v for k, v in a.items() if k != "full_content"}
+                    for _, a in sliced
+                ]
+                next_cursor = (newest_ts.isoformat() if newest_ts else (ts_raw or None))
+                payload = {
+                    "count": len(payload_articles),
+                    "total_new": len(matched),
+                    "truncated": len(matched) > len(sliced),
+                    "next_cursor": next_cursor,
+                    "articles": payload_articles,
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
+                }
+                body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            except Exception as exc:
+                logger.error("/api/since error: %s", exc)
+                self._send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, "Since query failed")
+                return
+            self._send_body("application/json; charset=utf-8", body, head_only)
             return
 
         # Route: /api/campaigns — list persistent threat campaigns with
@@ -889,7 +1025,7 @@ class ThreatWatchHandler(BaseHTTPRequestHandler):
         # Route: /api/quality — data quality metrics and feed health
         if path == "/api/quality":
             try:
-                from modules.feed_health import get_health_json
+                from modules.feed_health import get_health_json, signal_scores
                 articles = load_articles()
                 from collections import Counter
                 cat_counts = Counter(a.get("category", "Unknown") for a in articles)
@@ -914,6 +1050,11 @@ class ThreatWatchHandler(BaseHTTPRequestHandler):
                     },
                     "category_distribution": dict(cat_counts.most_common(15)),
                     "feed_health": get_health_json(),
+                    # Signal score per feed: combines success rate, avg
+                    # entries per fetch, and freshness status into 0-100 so
+                    # analysts can sort / threshold noisy feeds.
+                    "feed_signal_scores": signal_scores(),
+                    "classifier_feedback": _feedback_summary(),
                 }
                 body = json.dumps(quality, ensure_ascii=False).encode("utf-8")
             except Exception as exc:
