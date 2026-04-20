@@ -19,8 +19,10 @@ logger = logging.getLogger(__name__)
 
 CLUSTERS_PATH = OUTPUT_DIR / "clusters.json"
 
-# Entity extraction patterns
-_CVE_RE = re.compile(r"CVE-\d{4}-\d{4,}", re.IGNORECASE)
+# Entity patterns now live in modules.entities. Private-alias re-exports let
+# external callers (tests, other modules) keep their existing imports.
+from modules.entities import ACTOR_PATTERNS as _ACTOR_PATTERNS
+from modules.entities import CVE_RE as _CVE_RE
 
 # Major organization names for clustering (avoid overly generic names)
 _ORG_PATTERNS = [
@@ -31,42 +33,6 @@ _ORG_PATTERNS = [
     (re.compile(r"\b(FBI|CISA|NSA|Europol|Interpol|NCSC)\b"), None),
     (re.compile(r"\b(NHS|MOVEit|SolarWinds|Log4j|Exchange)\b"), None),
 ]
-
-# Threat actor patterns (Python versions of the frontend ACTOR_PATTERNS)
-_ACTOR_PATTERNS = [
-    # Nation-State: Russia
-    (re.compile(r"\bAPT28\b|Fancy\s*Bear|Forest\s*Blizzard", re.I), "APT28", "Nation-State", "Russia"),
-    (re.compile(r"\bAPT29\b|Cozy\s*Bear|Midnight\s*Blizzard|Nobelium", re.I), "APT29", "Nation-State", "Russia"),
-    (re.compile(r"Sandworm|Seashell\s*Blizzard", re.I), "Sandworm", "Nation-State", "Russia"),
-    (re.compile(r"Gamaredon|Shuckworm", re.I), "Gamaredon", "Nation-State", "Russia"),
-    (re.compile(r"\bTurla\b|Venomous\s*Bear", re.I), "Turla", "Nation-State", "Russia"),
-    # Nation-State: China
-    (re.compile(r"\bAPT41\b|Winnti|Double\s*Dragon", re.I), "APT41", "Nation-State", "China"),
-    (re.compile(r"Volt\s*Typhoon", re.I), "Volt Typhoon", "Nation-State", "China"),
-    (re.compile(r"Salt\s*Typhoon", re.I), "Salt Typhoon", "Nation-State", "China"),
-    (re.compile(r"Mustang\s*Panda", re.I), "Mustang Panda", "Nation-State", "China"),
-    (re.compile(r"Silk\s*Typhoon|Hafnium", re.I), "Silk Typhoon", "Nation-State", "China"),
-    # Nation-State: North Korea
-    (re.compile(r"Lazarus|Hidden\s*Cobra", re.I), "Lazarus Group", "Nation-State", "North Korea"),
-    (re.compile(r"Kimsuky|Emerald\s*Sleet", re.I), "Kimsuky", "Nation-State", "North Korea"),
-    (re.compile(r"BlueNoroff|Sapphire\s*Sleet", re.I), "BlueNoroff", "Nation-State", "North Korea"),
-    # Nation-State: Iran
-    (re.compile(r"MuddyWater|Mango\s*Sandstorm", re.I), "MuddyWater", "Nation-State", "Iran"),
-    (re.compile(r"Charming\s*Kitten|APT35|Mint\s*Sandstorm", re.I), "Charming Kitten", "Nation-State", "Iran"),
-    (re.compile(r"CyberAv3ngers", re.I), "CyberAv3ngers", "Nation-State", "Iran"),
-    (re.compile(r"\bHandala\b", re.I), "Handala", "Nation-State", "Iran"),
-    # Ransomware
-    (re.compile(r"LockBit", re.I), "LockBit", "Ransomware", "Criminal"),
-    (re.compile(r"BlackCat|ALPHV", re.I), "BlackCat/ALPHV", "Ransomware", "Criminal"),
-    (re.compile(r"\bCl0p\b|Clop", re.I), "Cl0p", "Ransomware", "Criminal"),
-    (re.compile(r"\bAkira\b", re.I), "Akira", "Ransomware", "Criminal"),
-    (re.compile(r"Black\s*Basta", re.I), "Black Basta", "Ransomware", "Criminal"),
-    (re.compile(r"RansomHub", re.I), "RansomHub", "Ransomware", "Criminal"),
-    (re.compile(r"\bQilin\b", re.I), "Qilin", "Ransomware", "Criminal"),
-    (re.compile(r"Scattered\s*Spider|UNC3944", re.I), "Scattered Spider", "Cybercrime", "Unknown"),
-    (re.compile(r"ShinyHunters", re.I), "ShinyHunters", "Cybercrime", "Unknown"),
-]
-
 
 def _parse_published(raw: str | None) -> datetime | None:
     """Thin wrapper over date_utils.parse_datetime — call-site stability only."""
@@ -158,8 +124,18 @@ def cluster_articles(articles: list[dict[str, Any]]) -> dict[str, Any]:
         cluster_indices = sorted(indices)  # Include all related
         seen_indices.update(cluster_indices)
 
+        # Sort members by published date ascending BEFORE the 10-article cap
+        # so the earliest-reporting outlet is always in the preview and its
+        # first entry is the "first reported by" winner. Articles without a
+        # parseable date sink to the bottom (parse_datetime returns None, and
+        # None compares as larger in the fallback key).
+        sorted_members = sorted(
+            cluster_indices,
+            key=lambda i: _parse_published(articles[i].get("published"))
+                          or datetime(9999, 12, 31, tzinfo=timezone.utc),
+        )
         cluster_articles_data = []
-        for idx in cluster_indices[:10]:  # Cap at 10 per cluster (preview only)
+        for idx in sorted_members[:10]:  # Cap at 10 per cluster (preview only)
             a = articles[idx]
             cluster_articles_data.append({
                 "title": a.get("title", ""),

@@ -10,7 +10,8 @@ from feedgen.feed import FeedGenerator
 
 from modules.config import SITE_URL, SITE_DOMAIN, OUTPUT_DIR, FEED_CUTOFF_DAYS
 from modules.date_utils import parse_datetime
-from modules.deduplicator import _collapse_regions, _MAX_MERGED_REGIONS
+from modules.regions import collapse_regions as _collapse_regions
+from modules.regions import MAX_MERGED_REGIONS as _MAX_MERGED_REGIONS
 
 HOURLY_DIR = OUTPUT_DIR / "hourly"
 DAILY_DIR = OUTPUT_DIR / "daily"
@@ -30,8 +31,12 @@ def _write_json(data, path):
     logger.info(f"Saved JSON to {path} ({len(data)} articles)")
 
 
-def _load_existing(path):
-    """Load existing articles from JSON file."""
+def load_existing(path):
+    """Load existing articles from a persisted JSON list file.
+
+    Public replacement for the legacy underscore-prefixed name. Returns an
+    empty list when the file is missing, malformed, or not a JSON array.
+    """
     if not path.exists():
         return []
     try:
@@ -42,6 +47,11 @@ def _load_existing(path):
         return []
 
 
+# Legacy alias retained so existing callers (tests, external scripts) that
+# imported the underscore-prefixed name continue to work.
+_load_existing = load_existing
+
+
 def _merge_articles(existing, new_articles):
     """Merge new articles into existing, dedup by hash AND title, drop older than cutoff."""
     seen_hashes = set()
@@ -49,14 +59,19 @@ def _merge_articles(existing, new_articles):
     merged = []
 
     def _add(article):
+        # Every article written by the pipeline must have a hash assigned by
+        # deduplicate_articles. Anything reaching this merge step without one
+        # is malformed data (bypassed dedup, legacy load, corrupt JSON) and
+        # gets dropped instead of mixed into the persisted corpus.
         h = article.get("hash", "")
+        if not h:
+            return
         title = article.get("title", "").strip().lower()
-        if h and h in seen_hashes:
+        if h in seen_hashes:
             return
         if title and title in seen_titles:
             return
-        if h:
-            seen_hashes.add(h)
+        seen_hashes.add(h)
         if title:
             seen_titles.add(title)
         merged.append(article)
@@ -112,7 +127,7 @@ def write_hourly_output(articles):
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H")
     _write_json(articles, HOURLY_DIR / f"{timestamp}.json")
     # Merge into rolling hourly latest
-    existing = _load_existing(STATIC_HOURLY)
+    existing = load_existing(STATIC_HOURLY)
     merged = _merge_articles(existing, articles)
     _write_json(merged, STATIC_HOURLY)
 
@@ -121,7 +136,7 @@ def write_daily_output(articles):
     date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     _write_json(articles, DAILY_DIR / f"{date}.json")
     # Merge into rolling daily latest (keeps all articles within cutoff window)
-    existing = _load_existing(STATIC_DAILY)
+    existing = load_existing(STATIC_DAILY)
     merged = _merge_articles(existing, articles)
     _write_json(merged, STATIC_DAILY)
 

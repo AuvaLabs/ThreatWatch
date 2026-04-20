@@ -240,6 +240,45 @@ _CAMPAIGN_ID_RE = _re_cve.compile(
 )
 
 
+def _enrich_campaign_with_articles(campaign: dict) -> dict:
+    """Attach first_reported + per-article metadata to a campaign record.
+
+    The persisted campaign only carries a list of article hashes (capped at
+    500) to keep campaigns.json small. Analysts need to see *which* outlets
+    covered the campaign and *when*. Here we cross-reference with the live
+    daily_latest.json, sort by published ascending, and expose the earliest
+    as `first_reported` plus the full matched list as `articles`.
+    """
+    from modules.date_utils import parse_datetime
+    hashes = set(campaign.get("article_hashes") or [])
+    matched = []
+    if hashes:
+        for a in load_articles():
+            if a.get("hash") in hashes:
+                matched.append({
+                    "title": a.get("title"),
+                    "translated_title": a.get("translated_title"),
+                    "link": a.get("link"),
+                    "source_name": a.get("source_name"),
+                    "published": a.get("published"),
+                    "category": a.get("category"),
+                    "feed_region": a.get("feed_region"),
+                })
+
+    def _sort_key(a: dict):
+        dt = parse_datetime(a.get("published"))
+        return dt or datetime(9999, 12, 31, tzinfo=timezone.utc)
+
+    matched.sort(key=_sort_key)
+    first_reported = matched[0] if matched else None
+    return {
+        **campaign,
+        "first_reported": first_reported,
+        "articles": matched,
+        "articles_in_window": len(matched),
+    }
+
+
 def _build_cve_view(cve_id: str) -> bytes:
     """Return all articles referencing `cve_id`, earliest first.
 
@@ -794,7 +833,8 @@ class ThreatWatchHandler(BaseHTTPRequestHandler):
             return
 
         # Route: /api/campaign/<id> — a single campaign's persistent record
-        # including the full article_hashes trail (up to _MAX_HASHES_PER_CAMPAIGN).
+        # with a first_reported block and the matched articles sorted
+        # ascending by publish date, so the earliest outlet wins attribution.
         if path.startswith("/api/campaign/"):
             campaign_id = path[len("/api/campaign/"):]
             if not _CAMPAIGN_ID_RE.fullmatch(campaign_id):
@@ -806,7 +846,8 @@ class ThreatWatchHandler(BaseHTTPRequestHandler):
                 if data is None:
                     self._send_error_json(HTTPStatus.NOT_FOUND, "Campaign not found")
                     return
-                body = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+                enriched = _enrich_campaign_with_articles(data)
+                body = json.dumps(enriched, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
             except Exception as exc:
                 logger.error("Campaign view error: %s", exc)
                 self._send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, "Campaign view failed")

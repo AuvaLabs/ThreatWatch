@@ -248,8 +248,8 @@ def main():
         logging.debug(f"Webhook dispatch skipped: {e}")
 
     # Load full corpus for AI features (not just new batch)
-    from modules.output_writer import _load_existing, STATIC_DAILY
-    all_articles = _load_existing(STATIC_DAILY)
+    from modules.output_writer import load_existing, STATIC_DAILY
+    all_articles = load_existing(STATIC_DAILY)
     if not all_articles:
         all_articles = enriched_articles
 

@@ -826,7 +826,27 @@ _CONTEXT_PRIORITY = {
 # Compound-event rules: when two categories co-occur, the "outcome" (what
 # happened) should win over the "method" (how it happened) IF the outcome
 # keyword appears explicitly in the title.
+#
+# Rule order matters: the loop returns on the first match, so actor-attribution
+# rules (Nation-State wins over Phishing/Malware technique categories) come
+# before technique-level overrides (Malware vs Phishing).
 _COMPOUND_OVERRIDES = [
+    # APT attribution beats technique labels: an article about APT29 using
+    # phishing is a Nation-State story, not a Phishing story.
+    {"if_both": ("Nation-State Attack", "Phishing"),
+     "title_re": re.compile(
+         r"\bapt\d|nation.?state|state.?sponsored|lazarus|volt\s*typhoon|salt\s*typhoon"
+         r"|sandworm|fancy\s*bear|cozy\s*bear|kitten|blizzard|sleet|sandstorm"
+         r"|scattered\s+spider|silk\s+typhoon|mustang\s+panda|winnti|turla",
+         re.I),
+     "winner": "Nation-State Attack"},
+    {"if_both": ("Nation-State Attack", "Malware"),
+     "title_re": re.compile(
+         r"\bapt\d|nation.?state|state.?sponsored|lazarus|volt\s*typhoon|salt\s*typhoon"
+         r"|sandworm|fancy\s*bear|cozy\s*bear|kitten|blizzard|sleet|sandstorm"
+         r"|scattered\s+spider|silk\s+typhoon|mustang\s+panda|winnti|turla",
+         re.I),
+     "winner": "Nation-State Attack"},
     # "data breach" + ransomware → Data Breach (breach is the outcome)
     {"if_both": ("Ransomware", "Data Breach"),
      "title_re": re.compile(r"data\s+breach|breached|data\s+leak|records\s+(stolen|exposed)", re.I),

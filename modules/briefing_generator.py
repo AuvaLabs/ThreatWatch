@@ -322,6 +322,12 @@ def generate_briefing(articles: list[dict[str, Any]]) -> dict[str, Any] | None:
     briefing_articles = day1[:]
     if len(briefing_articles) < 30:
         briefing_articles.extend(day3[:30 - len(briefing_articles)])
+    # Final fallback: if every article lacked a parseable timestamp so day1
+    # and day3 both came back empty, still generate a briefing from the full
+    # filtered corpus. Without this the briefing silently returns 0 articles
+    # analysed — much worse than a slightly-less-time-focused digest.
+    if not briefing_articles:
+        briefing_articles = list(all_filtered)
     briefing_articles = briefing_articles[:_MAX_DIGEST_ARTICLES]
 
     # Build trailing "this week" context from older articles, excluding
@@ -398,13 +404,27 @@ def generate_briefing(articles: list[dict[str, Any]]) -> dict[str, Any] | None:
 
         # Schema validation — new 5-section schema
         required = {"threat_level", "what_happened"}
-        # Backwards compat: map old field names to new
-        if "situation_overview" in briefing and "what_happened" not in briefing:
-            briefing["what_happened"] = briefing.pop("situation_overview")
-        if "priority_actions" in briefing and "what_to_do" not in briefing:
-            briefing["what_to_do"] = briefing.pop("priority_actions")
-        if "threat_forecast" in briefing and "outlook" not in briefing:
-            briefing["outlook"] = briefing.pop("threat_forecast")
+        # Backwards compat: accept both v1 (executive_summary / recommended_actions)
+        # and middle-era (situation_overview / priority_actions) field names.
+        # Each alternative maps to the current canonical field if the current
+        # field is not already present.
+        _LEGACY_MAP = (
+            ("situation_overview", "what_happened"),
+            ("executive_summary",  "what_happened"),
+            ("priority_actions",   "what_to_do"),
+            ("recommended_actions","what_to_do"),
+            ("threat_forecast",    "outlook"),
+        )
+        for legacy_key, new_key in _LEGACY_MAP:
+            if legacy_key in briefing and new_key not in briefing:
+                briefing[new_key] = briefing.pop(legacy_key)
+        # Normalise what_to_do shape: legacy versions sent a list of strings,
+        # current schema expects a list of dicts with at least {action: ...}.
+        wtd = briefing.get("what_to_do")
+        if isinstance(wtd, list):
+            briefing["what_to_do"] = [
+                {"action": a} if isinstance(a, str) else a for a in wtd
+            ]
         missing = required - briefing.keys()
         if missing:
             logger.warning(f"Intelligence briefing missing required fields: {missing}")

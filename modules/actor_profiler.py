@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from modules.config import STATE_DIR, OUTPUT_DIR
-from modules.incident_correlator import _ACTOR_PATTERNS
+from modules.entities import ACTOR_PATTERNS as _ACTOR_PATTERNS
 
 logger = logging.getLogger(__name__)
 
