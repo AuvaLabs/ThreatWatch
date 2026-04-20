@@ -247,10 +247,19 @@ def _build_cve_view(cve_id: str) -> bytes:
             continue
         matching.append(a)
         if epss_score is None:
-            for score in (a.get("epss_scores") or {}).values():
+            # `epss_scores` is a list of {cve_id, epss_score, ...} dicts per
+            # the EPSS enricher output. Pull the score matching THIS CVE if
+            # present; otherwise take the first numeric score we see.
+            for entry in (a.get("epss_scores") or []):
+                if not isinstance(entry, dict):
+                    continue
+                score = entry.get("epss_score")
                 if isinstance(score, (int, float)):
-                    epss_score = float(score)
-                    break
+                    if entry.get("cve_id", "").upper() == cve_id:
+                        epss_score = float(score)
+                        break
+                    if epss_score is None:
+                        epss_score = float(score)
 
     def _sort_key(a: dict):
         dt = parse_datetime(a.get("published")) or parse_datetime(a.get("timestamp"))

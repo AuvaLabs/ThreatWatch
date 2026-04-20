@@ -215,6 +215,16 @@ def main():
     except Exception as e:
         logging.warning(f"IOC annotation failed: {e}")
 
+    # Victim-sector tagging — labels each article with the SECTOR of the
+    # victim (Healthcare, Finance, Government, OT, ...). `feed_region` is
+    # source geography; `victim_sectors` is who got hit. Runs before write.
+    try:
+        from modules.victim_tagger import annotate_articles_with_sectors
+        sector_hits = annotate_articles_with_sectors(enriched_articles)
+        logging.info(f"Sector annotation: {sector_hits}/{len(enriched_articles)} articles tagged with victim sectors")
+    except Exception as e:
+        logging.warning(f"Sector annotation failed: {e}")
+
     # Trend detection — update keyword/category frequency tracking
     try:
         update_trends(enriched_articles)

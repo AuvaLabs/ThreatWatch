@@ -862,7 +862,7 @@ html, body {
   cursor: help;
 }
 
-.cve-pill, .ioc-pill {
+.cve-pill, .ioc-pill, .sector-pill {
   font-family: var(--font-mono);
   font-size: 9px;
   border-radius: var(--radius-sm);
@@ -874,12 +874,20 @@ html, body {
   color: var(--accent);
   background: var(--accent-dim);
   border: 1px solid rgba(59,130,246,0.2);
+  cursor: pointer;
 }
 .ioc-pill {
   color: var(--warning);
   background: rgba(245,158,11,0.07);
   border: 1px solid rgba(245,158,11,0.2);
 }
+.sector-pill {
+  color: var(--success);
+  background: rgba(34,197,94,0.07);
+  border: 1px solid rgba(34,197,94,0.2);
+  cursor: pointer;
+}
+.cve-pill:hover, .sector-pill:hover { filter: brightness(1.1); }
 
 /* Full IOC block inside detail panel — grouped by type, each row lists every
    indicator of that type with monospace so hashes and IPs line up cleanly. */
@@ -2772,6 +2780,7 @@ const state = {
   activeActor: null,    // {name, re} or null
   activeCategory: null, // {name, re} or null — chart category drilldown
   activeCveFilter: null, // string CVE ID, applied via CVE pill click
+  activeSectorFilter: null, // victim-sector name from pill click (distinct from activeSector chart drilldown)
   _actionDrilldown: null, // {type, value, label} — recommended action drilldown
   selectedItem: null,
   feedStatus: { threatdigest: false },
@@ -3782,6 +3791,7 @@ function transformArticles(articles) {
       cluster: article.cluster || null,
       cveIds: Array.isArray(article.cve_ids) ? article.cve_ids : [],
       iocs: article.iocs || null,
+      victimSectors: Array.isArray(article.victim_sectors) ? article.victim_sectors : [],
       _id: 'td-' + (article.hash || i)
     };
   });
@@ -3844,6 +3854,10 @@ function filterMatchesItem(filter, item) {
   // CVE drilldown — active when an analyst clicks a CVE pill on a card.
   if (state.activeCveFilter) {
     if (!(item.cveIds || []).includes(state.activeCveFilter)) return false;
+  }
+  // Victim-sector drilldown — active when an analyst clicks a sector pill.
+  if (state.activeSectorFilter) {
+    if (!(item.victimSectors || []).includes(state.activeSectorFilter)) return false;
   }
   // Category filter
   let catMatch = true;
@@ -3928,6 +3942,7 @@ function buildCardHTML(item) {
       ${buildStoryBadge(item)}
       ${buildCvePill(item)}
       ${buildIocPill(item)}
+      ${buildSectorPill(item)}
       ${countryHTML}
       <span class="card-readmore">\u2197 READ</span>
     </div>
@@ -3959,6 +3974,45 @@ function setCveFilter(cveId) {
     state.activeCveFilter = null;
   } else {
     state.activeCveFilter = cveId;
+  }
+  renderFeedCards();
+  const el = document.getElementById('main-content');
+  if (el) el.scrollTop = 0;
+}
+
+/* Victim-sector pill: the primary sector plus an '+N' overflow when the
+   article is tagged with multiple. Clickable — filters the feed down to that
+   sector. Icon per sector keeps the pill scannable at a glance. */
+const _SECTOR_ICONS = {
+  'Healthcare': '\uD83C\uDFE5',     // hospital
+  'Finance': '\uD83D\uDCB0',         // money bag
+  'Government': '\uD83C\uDFDB',      // classical building
+  'Education': '\uD83C\uDF93',       // graduation cap
+  'Energy': '\u26A1',                // high voltage
+  'Technology': '\uD83D\uDCBB',      // laptop
+  'Telecom': '\uD83D\uDCF6',         // signal bars
+  'Retail': '\uD83D\uDED2',          // shopping cart
+  'Manufacturing': '\uD83C\uDFED',   // factory
+  'Transportation': '\u2708',        // airplane
+  'Media': '\uD83D\uDCF0',           // newspaper
+  'Legal': '\u2696',                 // scales
+  'Critical Infrastructure': '\uD83D\uDEE1', // shield
+  'Hospitality': '\uD83C\uDFE8',     // hotel
+};
+function buildSectorPill(item) {
+  if (!item.victimSectors || !item.victimSectors.length) return '';
+  const primary = item.victimSectors[0];
+  const extra = item.victimSectors.length > 1 ? ` +${item.victimSectors.length - 1}` : '';
+  const icon = _SECTOR_ICONS[primary] || '\uD83C\uDFEC';
+  const tip = `Click to filter \u2014 ${item.victimSectors.join(', ')}`;
+  return `<span class="sector-pill" data-sector="${escapeHTML(primary)}" title="${escapeHTML(tip)}">${icon} ${escapeHTML(primary)}${extra}</span>`;
+}
+
+function setSectorFilter(sector) {
+  if (state.activeSectorFilter === sector) {
+    state.activeSectorFilter = null;
+  } else {
+    state.activeSectorFilter = sector;
   }
   renderFeedCards();
   const el = document.getElementById('main-content');
@@ -4010,12 +4064,13 @@ function renderFeedCards(reset = true) {
 
   // Update header count
   const countBadge = document.getElementById('feed-count-badge');
-  const hasDrilldown = state.activeSector || state.activeActor || state.activeCategory || state._actionDrilldown || state.activeCveFilter;
+  const hasDrilldown = state.activeSector || state.activeActor || state.activeCategory || state._actionDrilldown || state.activeCveFilter || state.activeSectorFilter;
   if (filter === 'all' && !hasDrilldown) {
     countBadge.textContent = '[' + state.newsItems.length + ' items]';
   } else {
     const labels = [];
     if (state.activeCveFilter) labels.push(state.activeCveFilter);
+    if (state.activeSectorFilter) labels.push(state.activeSectorFilter);
     if (state.activeCategory) labels.push(state.activeCategory.name);
     if (state.activeActor) labels.push(state.activeActor.name);
     if (state.activeSector) labels.push(state.activeSector.name);
@@ -4048,10 +4103,16 @@ function renderFeedCards(reset = true) {
     const card = container.querySelector(`[data-id="${item._id}"]`);
     if (!card) return;
     card.onclick = (e) => {
-      const pill = e.target.closest('.cve-pill[data-cve]');
-      if (pill) {
+      const cvePill = e.target.closest('.cve-pill[data-cve]');
+      if (cvePill) {
         e.stopPropagation();
-        setCveFilter(pill.dataset.cve);
+        setCveFilter(cvePill.dataset.cve);
+        return;
+      }
+      const sectorPill = e.target.closest('.sector-pill[data-sector]');
+      if (sectorPill) {
+        e.stopPropagation();
+        setSectorFilter(sectorPill.dataset.sector);
         return;
       }
       selectItem(item);
