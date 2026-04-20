@@ -17,34 +17,9 @@ from modules.feed_health import record_fetch
 from modules.deduplicator import normalize_url
 
 def _parse_article_date(date_str: str) -> datetime | None:
-    """Parse article date from various formats (RFC 2822, ISO 8601, etc.)."""
-    if not date_str:
-        return None
-    # Try RFC 2822 (e.g., "Mon, 14 Mar 2026 12:00:00 GMT")
-    try:
-        dt = parsedate_to_datetime(date_str)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
-    except (ValueError, TypeError):
-        pass
-    # Try ISO 8601 (e.g., "2026-03-14T12:00:00Z", "2026-03-14T12:00:00+00:00")
-    try:
-        cleaned = date_str.replace("Z", "+00:00")
-        dt = datetime.fromisoformat(cleaned)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
-    except (ValueError, TypeError):
-        pass
-    # Try bare date formats (e.g., "2026-03-14 12:00:00")
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d"):
-        try:
-            dt = datetime.strptime(date_str[:len(fmt) + 5], fmt)
-            return dt.replace(tzinfo=timezone.utc)
-        except (ValueError, TypeError):
-            continue
-    return None
+    """Thin wrapper over date_utils.parse_datetime — call-site stability only."""
+    from modules.date_utils import parse_datetime
+    return parse_datetime(date_str)
 
 
 _FEED_HEADERS = {

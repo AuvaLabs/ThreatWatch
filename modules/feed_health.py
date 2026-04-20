@@ -14,6 +14,7 @@ an error — it's just quiet. That goes into the stale check instead.
 
 import json
 import logging
+import threading
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -22,6 +23,14 @@ logger = logging.getLogger(__name__)
 from modules.config import STATE_DIR
 
 HEALTH_FILE = STATE_DIR / "feed_health.json"
+
+# record_fetch runs from 8 concurrent fetch threads. Without this lock, the
+# load→mutate→save sequence lets two threads both read an old snapshot and
+# each save their own mutation, silently dropping one of the updates. The lock
+# is coarse (covers the whole read-modify-write) because save_health() already
+# touches the filesystem — the contention cost is negligible compared to the
+# disk write itself.
+_health_lock = threading.Lock()
 
 _SUSPECT_DAYS = 3
 _DEAD_DAYS    = 7
@@ -73,6 +82,11 @@ def record_fetch(url: str, success: bool, entry_count: int = 0) -> None:
                                      and check for staleness
     success=False                  → actual error; increment error counter
     """
+    with _health_lock:
+        _record_fetch_locked(url, success, entry_count)
+
+
+def _record_fetch_locked(url: str, success: bool, entry_count: int) -> None:
     data = load_health()
     now  = _now_iso()
 

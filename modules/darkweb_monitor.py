@@ -300,16 +300,9 @@ def _parse_c2_tracker(resp: requests.Response, source: dict[str, Any], cutoff: d
 
 
 def _parse_date(date_str: str | None) -> datetime | None:
-    """Try to parse various date formats."""
-    if not date_str:
-        return None
-    for fmt in ("%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%Y-%m-%dT%H:%M:%S"):
-        try:
-            dt = datetime.strptime(date_str[:19], fmt[:len(date_str)])
-            return dt.replace(tzinfo=timezone.utc)
-        except (ValueError, TypeError):
-            continue
-    return None
+    """Thin wrapper over date_utils.parse_datetime — kept for call-site stability."""
+    from modules.date_utils import parse_datetime
+    return parse_datetime(date_str)
 
 
 # ── Country/region lookup tables (module-level for efficiency) ────────────────

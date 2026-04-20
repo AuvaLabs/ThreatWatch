@@ -26,8 +26,35 @@ SSR_PLACEHOLDER = "<!-- __SSR_DATA__ -->"
 WATCHLIST_WRITE_ENABLED = os.environ.get("WATCHLIST_WRITE_ENABLED", "").lower() in ("1", "true", "yes")
 WATCHLIST_TOKEN = os.environ.get("WATCHLIST_TOKEN", "")
 
-_cache = {}
+_cache: dict = {}
+_cache_lock = threading.Lock()  # guards all _cache writes; reads use GIL
 _ssr_lock = threading.Lock()
+
+# Peers from which we trust forwarded-IP headers. Behind nginx every request
+# appears to come from 127.0.0.1, so without this every public user is bucketed
+# into the same rate-limit window. We only honour the header when the TCP peer
+# is actually a trusted proxy — a direct-to-port attacker cannot forge their
+# way into a separate bucket.
+_TRUSTED_PROXIES = frozenset(
+    ip.strip() for ip in os.environ.get("TRUSTED_PROXIES", "127.0.0.1,::1").split(",")
+    if ip.strip()
+)
+
+
+def _get_client_ip(handler) -> str:
+    """Return the effective client IP for rate-limiting / logging.
+
+    Prefers `X-Real-IP` (set by nginx `proxy_set_header X-Real-IP $remote_addr`)
+    when the TCP peer is a configured trusted proxy. Falls back to
+    `client_address[0]` otherwise, which fails closed if the header is forged
+    from outside the proxy layer.
+    """
+    peer = handler.client_address[0]
+    if peer in _TRUSTED_PROXIES:
+        forwarded = handler.headers.get("X-Real-IP", "").strip()
+        if forwarded:
+            return forwarded
+    return peer
 
 # ── Rate limiting ─────────────────────────────────────────────────────────────
 _RATE_WINDOW  = 60   # seconds
@@ -77,7 +104,12 @@ _SECURITY_HEADERS = {
 
 
 def read_cached(file_path):
-    """Read file with in-memory cache (TTL-based)."""
+    """Read file with in-memory cache (TTL-based).
+
+    Reads of `_cache` rely on the GIL for atomicity; writes take `_cache_lock`
+    so a concurrent read never sees a half-populated tuple, and the
+    check-then-set is race-free against parallel evictions.
+    """
     now = time.time()
     key = str(file_path)
     entry = _cache.get(key)
@@ -85,10 +117,12 @@ def read_cached(file_path):
         return entry[1]
     try:
         data = file_path.read_bytes()
-        _cache[key] = (now, data)
+        with _cache_lock:
+            _cache[key] = (now, data)
         return data
     except FileNotFoundError:
-        _cache.pop(key, None)
+        with _cache_lock:
+            _cache.pop(key, None)
         raise
 
 
@@ -397,7 +431,8 @@ def build_ssr_data():
 
         # Serialize and cache
         ssr_json = json.dumps(ssr_payload, ensure_ascii=False, separators=(",", ":"))
-        _cache[key] = (now, ssr_json)
+        with _cache_lock:
+            _cache[key] = (now, ssr_json)
         return ssr_json
     finally:
         _ssr_lock.release()
@@ -422,7 +457,8 @@ def render_page():
     rendered = template.replace(SSR_PLACEHOLDER, ssr_script)
 
     body = rendered.encode("utf-8")
-    _cache[key] = (now, body)
+    with _cache_lock:
+        _cache[key] = (now, body)
     return body
 
 
@@ -576,7 +612,7 @@ class ThreatWatchHandler(BaseHTTPRequestHandler):
         self._handle_request(head_only=False)
 
     def do_POST(self):
-        client_ip = self.client_address[0]
+        client_ip = _get_client_ip(self)
         if _is_rate_limited(client_ip):
             self._send_error_json(HTTPStatus.TOO_MANY_REQUESTS, "Rate limit exceeded")
             return
@@ -620,7 +656,7 @@ class ThreatWatchHandler(BaseHTTPRequestHandler):
         self._send_error_json(HTTPStatus.METHOD_NOT_ALLOWED, "Method not allowed")
 
     def _handle_request(self, head_only=False):
-        client_ip = self.client_address[0]
+        client_ip = _get_client_ip(self)
         if _is_rate_limited(client_ip):
             self._send_error_json(HTTPStatus.TOO_MANY_REQUESTS,
                                   "Rate limit exceeded — max 120 requests per minute")
@@ -803,6 +839,9 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 
 
 def main():
+    # SSRF guard covers watchlist rehydration / any future outbound fetches.
+    from modules.safe_http import install_ssrf_guard
+    install_ssrf_guard()
     server = ThreadedHTTPServer(("0.0.0.0", PORT), ThreatWatchHandler)
     logger.info("ThreatWatch v2.0 server starting on http://0.0.0.0:%d", PORT)
     logger.info("Base directory: %s", BASE_DIR)

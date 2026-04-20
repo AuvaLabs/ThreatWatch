@@ -4,6 +4,8 @@ import ipaddress
 import logging
 import re
 import socket
+import threading
+
 import requests
 
 logger = logging.getLogger(__name__)
@@ -12,6 +14,11 @@ from bs4 import BeautifulSoup
 
 _CACHE: dict[str, str] = {}
 _CACHE_MAX = 1000
+# Fetch threads race on _CACHE: the check-then-insert pattern could insert the
+# same URL twice, and the FIFO eviction (pop next(iter(_CACHE))) could raise
+# RuntimeError if another thread mutates the dict concurrently. One lock
+# serialises both operations.
+_CACHE_LOCK = threading.Lock()
 
 
 def is_clearnet_url(url: str) -> bool:
@@ -157,22 +164,37 @@ def extract_url_from_gnews_summary(summary: str) -> str | None:
     return None
 
 
+def _cache_get(url: str) -> str | None:
+    with _CACHE_LOCK:
+        return _CACHE.get(url)
+
+
+def _cache_set(url: str, result: str) -> None:
+    with _CACHE_LOCK:
+        if len(_CACHE) >= _CACHE_MAX and url not in _CACHE:
+            # FIFO eviction: drop the oldest entry. iter() is safe here because
+            # we hold the lock against concurrent mutations.
+            _CACHE.pop(next(iter(_CACHE)), None)
+        _CACHE[url] = result
+
+
 # ==== Final URL Resolver ====
 def resolve_original_url(url: str, summary: str = '') -> str:
-    if url in _CACHE:
-        return _CACHE[url]
+    cached = _cache_get(url)
+    if cached is not None:
+        return cached
 
     # 1. Try to extract from Google News summary HTML (zero-cost, no HTTP)
     if 'news.google.com' in url and summary:
         from_summary = extract_url_from_gnews_summary(summary)
         if from_summary and is_clearnet_url(from_summary):
-            _CACHE[url] = from_summary
+            _cache_set(url, from_summary)
             return from_summary
 
     # 2. Try to decode the Google News protobuf URL locally (no HTTP)
     gnews_decoded = decode_google_news_url(url)
     if gnews_decoded and is_clearnet_url(gnews_decoded):
-        _CACHE[url] = gnews_decoded
+        _cache_set(url, gnews_decoded)
         return gnews_decoded
 
     # 3. Non-Google URLs: embedded param, redirect, or canonical HTML
@@ -186,11 +208,9 @@ def resolve_original_url(url: str, summary: str = '') -> str:
                 result = redirected
             else:
                 result = extract_canonical_from_html(url) or url
-        if len(_CACHE) >= _CACHE_MAX:
-            _CACHE.pop(next(iter(_CACHE)))
-        _CACHE[url] = result
+        _cache_set(url, result)
         return result
 
     # 4. Google URL with no decodable content — keep as-is (don't hit Google)
-    _CACHE[url] = url
+    _cache_set(url, url)
     return url

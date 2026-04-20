@@ -104,6 +104,11 @@ def enrich_articles(articles, summarize=False, stats=None):
 def main():
     setup_logger()
     validate_config()
+    # Install SSRF guard at process start so every outbound fetch (feed
+    # fetchers, article scraper, url resolver, NVD/EPSS enrichers) can't be
+    # tricked into hitting localhost / cloud IMDS via DNS rebinding.
+    from modules.safe_http import install_ssrf_guard
+    install_ssrf_guard()
     logging.info("==== Starting ThreatDigest Main Run ====")
 
     stats = RunStats()
