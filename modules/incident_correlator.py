@@ -198,6 +198,30 @@ def cluster_articles(articles: list[dict[str, Any]]) -> dict[str, Any]:
     # AI synthesis for top clusters (limit token usage)
     _synthesize_clusters(clusters[:8])
 
+    # Campaign persistence — annotate each cluster with a stable campaign_id
+    # and an ever-earliest first_observed that survives across pipeline runs.
+    # The cluster's own `first_seen` only reflects articles inside the rolling
+    # 7-day window, so a long-running threat like Volt Typhoon would otherwise
+    # look freshly-born every Monday after older coverage ages out.
+    try:
+        from modules.campaign_tracker import record_clusters, load_campaigns
+        campaign_map = record_clusters(clusters)
+        campaigns_by_id = load_campaigns()
+        for cluster in clusters:
+            key = f"{cluster.get('entity_type')}:{cluster.get('entity_name')}"
+            cid = campaign_map.get(key)
+            if not cid:
+                continue
+            campaign = campaigns_by_id.get(cid) or {}
+            cluster["campaign_id"] = cid
+            cluster["first_observed"] = campaign.get("first_observed") or cluster.get("first_seen")
+            cluster["campaign_status"] = campaign.get("status") or "active"
+            cluster["total_observed_articles"] = campaign.get(
+                "total_observed_articles", cluster.get("article_count", 0),
+            )
+    except Exception as exc:
+        logger.warning(f"Campaign tracking failed (non-fatal): {exc}")
+
     # Persist every cluster (not just top 15) so the frontend can annotate
     # all related articles. Display surfaces still slice to their own caps.
     cluster_data = {
