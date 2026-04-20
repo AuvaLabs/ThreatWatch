@@ -208,13 +208,19 @@ def annotate_articles_with_sectors(articles: Iterable[dict]) -> int:
     hits = 0
     for a in articles:
         is_darkweb = bool(a.get("darkweb") or a.get("isDarkweb"))
-        summary_parts = [a.get("summary")]
-        if not is_darkweb:
-            summary_parts.append(a.get("full_content"))
-        sectors = tag_sectors(
-            a.get("title"),
-            " ".join(filter(None, summary_parts)),
-        )
+        # Darkweb articles' summary AND full_content both come from the
+        # aggregator page (ransomware.live, threatfox.abuse.ch). That page
+        # enumerates every possible sector in a checkbox sidebar, so every
+        # victim post would end up tagged with every sector. Match on title
+        # only — the victim name ('Frost Bank', 'NHS Foundation Trust', etc.)
+        # carries the real signal.
+        if is_darkweb:
+            sectors = tag_sectors(a.get("title"), None)
+        else:
+            sectors = tag_sectors(
+                a.get("title"),
+                " ".join(filter(None, [a.get("summary"), a.get("full_content")])),
+            )
         if sectors:
             a["victim_sectors"] = sectors
             hits += 1

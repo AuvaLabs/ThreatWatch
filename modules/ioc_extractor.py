@@ -122,11 +122,15 @@ _BENIGN_DOMAINS = frozenset({
     "theregister.com", "the420.in", "marketscreener.com", "01net.com",
     "wired.com", "ars-technica.com", "arstechnica.com", "cnet.com",
     "reuters.com", "bloomberg.com", "ft.com", "nytimes.com", "wsj.com",
+    "gbhackers.com", "pymnts.com", "mezha.net", "openpr.com", "vietnam.vn",
+    "vulncheck.com", "vuldb.com", "cpuid.com", "shutterstock.com",
+    "wordfence.com", "autodesk.com", "appstreaming.autodesk.com",
     # Advisory / NVD / government
-    "nvd.nist.gov", "cve.mitre.org", "cisa.gov", "ncsc.gov.uk",
+    "nvd.nist.gov", "nist.gov", "cve.mitre.org", "cisa.gov", "ncsc.gov.uk",
     "advisory.splunk.com", "helpx.adobe.com", "support.microsoft.com",
-    "msrc.microsoft.com", "cert.gov.ua", "cert-fr.cossi.fr",
+    "msrc.microsoft.com", "cert.gov.ua", "cert-fr.cossi.fr", "cert.pl",
     "first.org", "attack.mitre.org", "sans.org", "sans.edu",
+    "plugins.trac.wordpress.org", "wordpress.org",
     # Dark-web trackers used as sources by the pipeline itself
     "ransomware.live", "ransomwatch.net", "threatfox.abuse.ch",
     "abuse.ch", "malware-traffic-analysis.net", "databreaches.net",
