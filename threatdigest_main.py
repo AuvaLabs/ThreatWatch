@@ -191,6 +191,15 @@ def main():
     except Exception as e:
         logging.warning(f"ATT&CK tagging failed: {e}")
 
+    # CVE ID extraction — surfaces `cve_ids` on each article so the dashboard
+    # can facet by CVE. Runs before write so values are persisted.
+    try:
+        from modules.incident_correlator import annotate_articles_with_cves
+        cve_hits = annotate_articles_with_cves(enriched_articles)
+        logging.info(f"CVE annotation: {cve_hits}/{len(enriched_articles)} articles tagged with CVE IDs")
+    except Exception as e:
+        logging.warning(f"CVE annotation failed: {e}")
+
     # Trend detection — update keyword/category frequency tracking
     try:
         update_trends(enriched_articles)

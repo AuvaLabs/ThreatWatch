@@ -89,6 +89,27 @@ def _parse_published(raw: str | None) -> datetime | None:
     return dt
 
 
+def annotate_articles_with_cves(articles: list[dict]) -> int:
+    """Extract CVE IDs from title+summary and write them onto each article.
+
+    Runs before output write so `cve_ids` is persisted on every article, not
+    just computed ephemerally during clustering. Returns the number of articles
+    that gained at least one CVE ID. Safe to call multiple times — overwrites
+    any existing `cve_ids` field with the freshly extracted set.
+    """
+    hits = 0
+    for a in articles:
+        text = (a.get("title") or "") + " " + (a.get("summary") or "")
+        cves = sorted({m.group(0).upper() for m in _CVE_RE.finditer(text)})
+        if cves:
+            a["cve_ids"] = cves
+            hits += 1
+        elif "cve_ids" in a:
+            # Stale value from a previous enrichment — keep data self-consistent
+            del a["cve_ids"]
+    return hits
+
+
 def _extract_entities(article: dict) -> list[tuple[str, str]]:
     """Extract clustering entities from an article. Returns [(type, entity_name)]."""
     title = article.get("title", "")
