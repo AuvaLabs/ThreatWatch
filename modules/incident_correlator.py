@@ -69,24 +69,9 @@ _ACTOR_PATTERNS = [
 
 
 def _parse_published(raw: str | None) -> datetime | None:
-    """Best-effort parse of `published` which may be RFC822 or ISO8601."""
-    if not raw:
-        return None
-    dt: datetime | None = None
-    # Try ISO8601 first (cheap; matches "2026-04-14T18:17:35.100")
-    try:
-        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-    except (ValueError, TypeError):
-        dt = None
-    # Fall back to RFC822 (e.g. "Fri, 17 Apr 2026 11:30:00 GMT")
-    if dt is None:
-        try:
-            dt = parsedate_to_datetime(raw)
-        except (ValueError, TypeError):
-            dt = None
-    if dt and dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt
+    """Thin wrapper over date_utils.parse_datetime — call-site stability only."""
+    from modules.date_utils import parse_datetime
+    return parse_datetime(raw)
 
 
 def annotate_articles_with_cves(articles: list[dict]) -> int:

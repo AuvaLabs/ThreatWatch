@@ -26,9 +26,15 @@ AI_ESCALATION_CATEGORIES = frozenset({
     "General Cyber Threat",
 })
 
-# Cap AI escalations per pipeline run to control token usage
+# Cap AI escalations per pipeline run to control token usage. The counter is
+# incremented from multiple threads (classify_article runs inside a
+# ThreadPoolExecutor); without the lock, two threads could both see
+# `_escalation_count < _MAX_ESCALATIONS_PER_RUN`, both decide to escalate, and
+# both increment — letting the run blow past the budget cap.
+import threading as _threading
 _MAX_ESCALATIONS_PER_RUN = 20
 _escalation_count = 0
+_escalation_lock = _threading.Lock()
 
 
 def _should_escalate(keyword_result):
@@ -38,9 +44,9 @@ def _should_escalate(keyword_result):
     if not groq_available() and not ANTHROPIC_API_KEY:
         return False
 
-    global _escalation_count
-    if _escalation_count >= _MAX_ESCALATIONS_PER_RUN:
-        return False
+    with _escalation_lock:
+        if _escalation_count >= _MAX_ESCALATIONS_PER_RUN:
+            return False
 
     if not keyword_result.get("is_cyber_attack"):
         return False
@@ -111,7 +117,8 @@ def classify_article(title, content=None, source_language="en"):
             )
             ai_result = _classify_via_groq(title, content)
             if ai_result and not ai_result.get("_cached"):
-                _escalation_count += 1
+                with _escalation_lock:
+                    _escalation_count += 1
 
             if ai_result:
                 ai_result["_ai_enhanced"] = True
@@ -129,7 +136,8 @@ def classify_article(title, content=None, source_language="en"):
             if ai_result.get("ai_analysis_failed") or ai_result.get("_budget_skipped"):
                 return keyword_result
 
-            _escalation_count += 1
+            with _escalation_lock:
+                _escalation_count += 1
             ai_result["_ai_enhanced"] = True
             ai_result["_keyword_category"] = keyword_result.get("category")
             ai_result["_keyword_confidence"] = keyword_result.get("confidence", 0)

@@ -189,7 +189,10 @@ class TestHealthEndpoint:
         sw._cache.clear()
 
     def test_health_returns_valid_json(self, tmp_path):
-        with patch("serve_threatwatch.load_stats", return_value={"latest": {"completed_at": "2026-01-01T00:00:00+00:00", "articles_fetched": 42, "cyber_articles": 20, "api_cost_today": 0.05}}), \
+        # Use a fresh completed_at so the freshness check passes and status=ok.
+        from datetime import datetime, timezone
+        fresh = datetime.now(timezone.utc).isoformat()
+        with patch("serve_threatwatch.load_stats", return_value={"latest": {"completed_at": fresh, "articles_fetched": 42, "cyber_articles": 20, "api_cost_today": 0.05}}), \
              patch("serve_threatwatch.BASE_DIR", tmp_path):
             body = sw.build_health()
         data = json.loads(body)
@@ -199,11 +202,13 @@ class TestHealthEndpoint:
         assert data["articles_cyber"] == 20
 
     def test_health_handles_missing_stats(self, tmp_path):
+        # No completed_at in stats → status="unknown" under the contract that
+        # reports real health rather than always returning "ok".
         with patch("serve_threatwatch.load_stats", return_value={}), \
              patch("serve_threatwatch.BASE_DIR", tmp_path):
             body = sw.build_health()
         data = json.loads(body)
-        assert data["status"] == "ok"
+        assert data["status"] == "unknown"
         assert data["articles_total"] == 0
 
     def test_health_includes_feed_summary(self, tmp_path):

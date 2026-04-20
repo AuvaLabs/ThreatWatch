@@ -223,7 +223,11 @@ def deduplicate_articles(articles: list[dict[str, Any]]) -> list[dict[str, Any]]
     # Map hash -> index in unique_articles for cross-region merging
     hash_to_idx = {}
 
-    for article in articles:
+    for raw_article in articles:
+        # Shallow-copy at loop entry so we never mutate the caller's dicts.
+        # Downstream (_merge_region, _add_related) writes fields onto the
+        # deduped article — we want those writes contained to our own copies.
+        article = {**raw_article}
         raw_hash = article.get("hash")
         if not raw_hash:
             normalized_link = normalize_url(article["link"])
@@ -314,7 +318,9 @@ def _add_related(unique_articles: list[dict[str, Any]], duplicate_article: dict[
         # Merge regions: combine feed_region from duplicate into original
         _merge_region(original, duplicate_article)
 
-        related = original.get("related_articles", [])
+        # Build a NEW list to avoid mutating a related_articles list that
+        # might still be shared with the caller's raw article dict.
+        related = list(original.get("related_articles", []))
         related.append({
             "title": duplicate_article["title"],
             "link": duplicate_article["link"],

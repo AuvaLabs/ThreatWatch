@@ -9,6 +9,7 @@ from pathlib import Path
 from feedgen.feed import FeedGenerator
 
 from modules.config import SITE_URL, SITE_DOMAIN, OUTPUT_DIR, FEED_CUTOFF_DAYS
+from modules.date_utils import parse_datetime
 from modules.deduplicator import _collapse_regions, _MAX_MERGED_REGIONS
 
 HOURLY_DIR = OUTPUT_DIR / "hourly"
@@ -68,22 +69,21 @@ def _merge_articles(existing, new_articles):
     for article in existing:
         _add(article)
 
-    # Drop articles older than cutoff window (check both timestamp and published)
+    # Drop articles older than cutoff window (check both timestamp and published).
+    # Policy: if EITHER parseable date is before cutoff, drop. If BOTH dates are
+    # missing or unparseable, KEEP the article — we previously fell back to
+    # datetime.now() on parse failure, which silently kept corrupt-date articles
+    # forever, but the opposite (drop everything we can't date) would bleed
+    # legit data.
     cutoff = datetime.now(timezone.utc) - timedelta(days=FEED_CUTOFF_DAYS)
     filtered = []
     for article in merged:
         too_old = False
         for date_field in ("timestamp", "published"):
-            date_str = article.get(date_field, "")
-            if not date_str:
-                continue
-            try:
-                article_dt = _parse_pub_date(date_str)
-                if article_dt < cutoff:
-                    too_old = True
-                    break
-            except (ValueError, TypeError):
-                pass
+            article_dt = parse_datetime(article.get(date_field, ""))
+            if article_dt is not None and article_dt < cutoff:
+                too_old = True
+                break
         if too_old:
             continue
         filtered.append(article)
@@ -127,26 +127,10 @@ def write_daily_output(articles):
 
 
 def _parse_pub_date(date_str):
-    from email.utils import parsedate_to_datetime
-
-    try:
-        return parsedate_to_datetime(date_str)
-    except Exception:
-        pass
-    try:
-        dt = datetime.fromisoformat(date_str)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
-    except Exception:
-        pass
-    # Try common formats without timezone
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d"):
-        try:
-            return datetime.strptime(date_str, fmt).replace(tzinfo=timezone.utc)
-        except (ValueError, TypeError):
-            continue
-    return datetime.now(timezone.utc)
+    """Back-compat shim — returns `datetime.now()` on failure as older callers
+    expected. New code should call `parse_datetime` directly and handle None.
+    """
+    return parse_datetime(date_str) or datetime.now(timezone.utc)
 
 
 def write_rss_output(articles):
@@ -177,9 +161,11 @@ def write_rss_output(articles):
         summary_text = article.get("summary") or "No summary available."
         fe.description(summary_text)
 
-        pub_date = _parse_pub_date(
-            article.get("published", datetime.now(timezone.utc).isoformat())
-        )
+        # RSS items REQUIRE a pubDate (feedgen validates). If we can't parse
+        # the upstream date, fall back to "now" — acceptable here because RSS
+        # consumers only need *some* valid RFC 822 date, unlike the cutoff
+        # check above which must never hallucinate a date.
+        pub_date = parse_datetime(article.get("published", "")) or datetime.now(timezone.utc)
         fe.pubDate(pub_date)
 
     _ensure_dir(RSS_PATH.parent)
