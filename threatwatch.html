@@ -4031,21 +4031,34 @@ function buildIocPill(item) {
   return `<span class="ioc-pill" title="${escapeHTML(parts.join(', '))}">\uD83E\uDDEC ${total} IOC${total === 1 ? '' : 's'}</span>`;
 }
 
-/* Story-cluster pill: shows "Story: 5d old · 29 sources" when the article is
-   part of a multi-outlet cluster older than 24h. Helps the reader see that a
-   fresh-looking feed entry is actually follow-on coverage of an older story. */
+/* Story-cluster pill: when the article belongs to a campaign tracked across
+   pipeline runs, prefer campaign `first_observed` (ever-earliest sighting)
+   over the cluster's `first_seen` (earliest article in the current 7-day
+   window). A long-running campaign therefore keeps its real age instead of
+   resetting each Monday when the corpus rotates. */
 function buildStoryBadge(item) {
   const c = item.cluster;
-  if (!c || !c.first_seen || !c.article_count || c.article_count < 3) return '';
-  const firstSeen = new Date(c.first_seen).getTime();
-  if (!firstSeen) return '';
-  const ageMs = Date.now() - firstSeen;
+  if (!c || !c.article_count || c.article_count < 3) return '';
+  // Prefer the persistent campaign timestamp; fall back to cluster first_seen
+  // when campaign tracking is absent (first run after deploy, etc.).
+  const anchorIso = c.first_observed || c.first_seen;
+  if (!anchorIso) return '';
+  const anchor = new Date(anchorIso).getTime();
+  if (!anchor) return '';
+  const ageMs = Date.now() - anchor;
   if (ageMs < 86400000) return '';  // less than 24h — not a recurring story yet
   const days = Math.floor(ageMs / 86400000);
-  const ageLabel = days >= 1 ? days + 'd old' : Math.floor(ageMs / 3600000) + 'h old';
+  const months = Math.floor(days / 30);
+  const ageLabel = months >= 1
+    ? `${months}mo active`
+    : (days >= 1 ? `${days}d old` : `${Math.floor(ageMs / 3600000)}h old`);
   const entity = c.entity_name ? String(c.entity_name) : 'Story';
-  const tip = `Part of "${entity}" story \u2014 ${c.article_count} articles across outlets, first seen ${new Date(c.first_seen).toUTCString()}`;
-  return `<span class="story-pill" title="${escapeHTML(tip)}">\uD83D\uDCCC Story: ${ageLabel} \u00B7 ${c.article_count} sources</span>`;
+  const status = c.campaign_status ? ` \u00B7 ${c.campaign_status}` : '';
+  const outletCount = c.total_observed_articles || c.article_count;
+  const tip = c.campaign_id
+    ? `Campaign "${entity}" \u2014 ${outletCount} articles ever observed, first seen ${new Date(anchorIso).toUTCString()}${c.campaign_status ? ', status: ' + c.campaign_status : ''}`
+    : `Part of "${entity}" story \u2014 ${c.article_count} articles across outlets, first seen ${new Date(anchorIso).toUTCString()}`;
+  return `<span class="story-pill" title="${escapeHTML(tip)}">\uD83D\uDCCC ${escapeHTML(entity)}: ${ageLabel}${status} \u00B7 ${outletCount} sources</span>`;
 }
 
 function renderFeedCards(reset = true) {

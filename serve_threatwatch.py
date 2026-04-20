@@ -203,6 +203,13 @@ def _annotate_with_clusters(articles: list, clusters_payload: dict | None) -> No
             "entity_type": c.get("entity_type"),
             "article_count": c.get("article_count"),
             "first_seen": c.get("first_seen"),
+            # Campaign fields survive across pipeline runs — the frontend
+            # story-pill prefers first_observed so long-running campaigns
+            # don't appear "new" each Monday after the 7-day window rolls.
+            "campaign_id": c.get("campaign_id"),
+            "first_observed": c.get("first_observed"),
+            "campaign_status": c.get("campaign_status"),
+            "total_observed_articles": c.get("total_observed_articles"),
         }
         for h in c.get("article_hashes") or []:
             prev = index.get(h)
@@ -227,6 +234,10 @@ def _annotate_with_clusters(articles: list, clusters_payload: dict | None) -> No
 # `_build_cve_view`, which accepts arbitrary path tail under /api/cve/.
 import re as _re_cve
 _CVE_PATH_RE = _re_cve.compile(r"CVE-\d{4}-\d{4,7}")
+# Campaign IDs are UUID4s minted by campaign_tracker.
+_CAMPAIGN_ID_RE = _re_cve.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+)
 
 
 def _build_cve_view(cve_id: str) -> bytes:
@@ -755,6 +766,52 @@ class ThreatWatchHandler(BaseHTTPRequestHandler):
                 self._send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, "Render error")
                 return
             self._send_body("text/html; charset=utf-8", body, head_only)
+            return
+
+        # Route: /api/campaigns — list persistent threat campaigns with
+        # optional ?status=active|dormant|archived filter.
+        if path == "/api/campaigns":
+            try:
+                from modules.campaign_tracker import list_campaigns
+                qs = parse_qs(parsed.query)
+                status = (qs.get("status", [None])[0] or "").strip() or None
+                if status and status not in ("active", "dormant", "archived", "unknown"):
+                    self._send_error_json(HTTPStatus.BAD_REQUEST, "Invalid status filter")
+                    return
+                items = list_campaigns(status=status)
+                payload = {
+                    "total": len(items),
+                    "status_filter": status,
+                    "campaigns": items,
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
+                }
+                body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            except Exception as exc:
+                logger.error("Campaigns list error: %s", exc)
+                self._send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, "Campaigns list failed")
+                return
+            self._send_body("application/json; charset=utf-8", body, head_only)
+            return
+
+        # Route: /api/campaign/<id> — a single campaign's persistent record
+        # including the full article_hashes trail (up to _MAX_HASHES_PER_CAMPAIGN).
+        if path.startswith("/api/campaign/"):
+            campaign_id = path[len("/api/campaign/"):]
+            if not _CAMPAIGN_ID_RE.fullmatch(campaign_id):
+                self._send_error_json(HTTPStatus.BAD_REQUEST, "Invalid campaign id")
+                return
+            try:
+                from modules.campaign_tracker import get_campaign
+                data = get_campaign(campaign_id)
+                if data is None:
+                    self._send_error_json(HTTPStatus.NOT_FOUND, "Campaign not found")
+                    return
+                body = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            except Exception as exc:
+                logger.error("Campaign view error: %s", exc)
+                self._send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, "Campaign view failed")
+                return
+            self._send_body("application/json; charset=utf-8", body, head_only)
             return
 
         # Route: /api/cve/<ID> — all articles referencing the given CVE, sorted
