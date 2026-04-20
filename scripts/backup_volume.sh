@@ -31,3 +31,34 @@ ls -1t "$BACKUP_DIR"/tw_*.tgz 2>/dev/null | tail -n "+$((KEEP + 1))" | xargs -r 
 
 SIZE=$(du -h "$OUT" | awk '{print $1}')
 echo "[$(date -u +%FT%TZ)] backup ok: $OUT ($SIZE), retaining last $KEEP"
+
+# Optional offsite sync — set any of the following to enable:
+#   TW_OFFSITE_RCLONE="remote:bucket/path"    uses rclone (B2, R2, S3, Drive, ...)
+#   TW_OFFSITE_SCP="user@host:/path"          uses ssh+scp to another box
+#   TW_OFFSITE_RSYNC="user@host:/path"        uses rsync over ssh (preserves the
+#                                             rotation on the remote side too)
+# All three are independent; if multiple are set, all run.
+if [ -n "${TW_OFFSITE_RCLONE:-}" ] && command -v rclone >/dev/null 2>&1; then
+  if rclone copy "$OUT" "$TW_OFFSITE_RCLONE" 2>/tmp/tw_rclone.err; then
+    echo "[$(date -u +%FT%TZ)] offsite rclone ok: $TW_OFFSITE_RCLONE"
+  else
+    echo "[$(date -u +%FT%TZ)] offsite rclone FAILED: $(tr '\n' ' ' </tmp/tw_rclone.err)"
+  fi
+fi
+
+if [ -n "${TW_OFFSITE_SCP:-}" ]; then
+  if scp -q -o StrictHostKeyChecking=accept-new "$OUT" "$TW_OFFSITE_SCP" 2>/tmp/tw_scp.err; then
+    echo "[$(date -u +%FT%TZ)] offsite scp ok: $TW_OFFSITE_SCP"
+  else
+    echo "[$(date -u +%FT%TZ)] offsite scp FAILED: $(tr '\n' ' ' </tmp/tw_scp.err)"
+  fi
+fi
+
+if [ -n "${TW_OFFSITE_RSYNC:-}" ] && command -v rsync >/dev/null 2>&1; then
+  if rsync -aq --delete-after -e "ssh -o StrictHostKeyChecking=accept-new" \
+       "$BACKUP_DIR/" "$TW_OFFSITE_RSYNC/" 2>/tmp/tw_rsync.err; then
+    echo "[$(date -u +%FT%TZ)] offsite rsync ok: $TW_OFFSITE_RSYNC"
+  else
+    echo "[$(date -u +%FT%TZ)] offsite rsync FAILED: $(tr '\n' ' ' </tmp/tw_rsync.err)"
+  fi
+fi

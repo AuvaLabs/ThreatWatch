@@ -71,6 +71,56 @@ def save_health(data: dict) -> None:
     HEALTH_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+def _signal_score(entry: dict) -> float:
+    """Compute a 0-100 signal score for a feed.
+
+    Combines three dimensions:
+    - Success rate (fetches_successful / fetches_total). A feed that
+      intermittently 500s deserves a lower score even if its good fetches
+      return content.
+    - Productivity (avg entries per successful fetch, clamped to 1.0 at 20).
+      A feed returning 20+ articles per run is at full productivity; fewer
+      scales linearly.
+    - Freshness (penalty for stale / dead / suspect status). A feed that
+      has not returned in 30+ days is useless at any volume.
+
+    Score is a simple multiplicative product scaled to 100 so analysts can
+    sort / threshold without knowing the internals.
+    """
+    total = entry.get("fetches_total") or 0
+    ok = entry.get("fetches_successful") or 0
+    entries = entry.get("entries_total") or 0
+    if total == 0:
+        return 0.0
+    success_rate = ok / total
+    productivity = min((entries / ok) / 20.0, 1.0) if ok else 0.0
+    status = entry.get("status", "ok")
+    freshness = {"ok": 1.0, "error": 0.7, "suspect": 0.5, "stale": 0.3, "dead": 0.1}.get(status, 0.5)
+    return round(success_rate * productivity * freshness * 100.0, 1)
+
+
+def signal_scores() -> list[dict]:
+    """Return every tracked feed with its computed signal score, sorted desc."""
+    data = load_health()
+    items = [
+        {
+            "url": url,
+            "status": entry.get("status", "ok"),
+            "fetches_total": entry.get("fetches_total", 0),
+            "fetches_successful": entry.get("fetches_successful", 0),
+            "entries_total": entry.get("entries_total", 0),
+            "avg_entries_per_fetch": (
+                round((entry.get("entries_total", 0) / entry.get("fetches_successful", 1)), 2)
+                if entry.get("fetches_successful") else 0.0
+            ),
+            "signal_score": _signal_score(entry),
+        }
+        for url, entry in data.items()
+    ]
+    items.sort(key=lambda i: i["signal_score"], reverse=True)
+    return items
+
+
 # ── core update ────────────────────────────────────────────────────────────
 
 def record_fetch(url: str, success: bool, entry_count: int = 0) -> None:
@@ -97,9 +147,19 @@ def _record_fetch_locked(url: str, success: bool, entry_count: int) -> None:
         "last_success":       None,
         "last_checked":       None,
         "status":             "ok",
+        # Volume metrics driving the signal score. All monotonic counters.
+        "fetches_total":      0,
+        "fetches_successful": 0,
+        "entries_total":      0,
     })
 
+    # Ensure older entries pick up the volume fields lazily (forwards-compat).
+    entry.setdefault("fetches_total", 0)
+    entry.setdefault("fetches_successful", 0)
+    entry.setdefault("entries_total", 0)
+
     entry["last_checked"] = now
+    entry["fetches_total"] += 1
 
     if success and entry_count > 0:
         # Healthy fetch — reset all error state
@@ -107,10 +167,13 @@ def _record_fetch_locked(url: str, success: bool, entry_count: int) -> None:
         entry["first_error"]        = None
         entry["last_success"]       = now
         entry["status"]             = "ok"
+        entry["fetches_successful"] += 1
+        entry["entries_total"]      += entry_count
 
     elif success and entry_count == 0:
         # Quiet feed — HTTP ok, no articles in window; don't count as error
-        # Check stale: if last_success exists and is old
+        # but DO count as a successful fetch so signal_score reflects volume.
+        entry["fetches_successful"] += 1
         last_ok = entry.get("last_success")
         if last_ok and _days_since(last_ok) >= _STALE_DAYS:
             entry["status"] = "stale"
