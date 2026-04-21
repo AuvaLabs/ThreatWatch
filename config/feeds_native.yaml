@@ -187,9 +187,10 @@
   category: Native
   region: EU
 
-- url: https://www.cyber.gov.au/about-us/view-all-content/alerts-and-advisories/rss.xml
-  category: Native
-  region: Australia
+# Disabled 2026-04-21: cyber.gov.au RSS times out consistently (likely geo-blocked or removed)
+# - url: https://www.cyber.gov.au/about-us/view-all-content/alerts-and-advisories/rss.xml
+#   category: Native
+#   region: Australia
 
 # Tier 7: Ransomware & Malware specific
 # No More Ransom RSS returns empty feed (all URL variants tested, none have entries)
@@ -277,9 +278,10 @@
 #   category: Native
 #   region: Germany
 
-- url: https://www.cccs-cccs.gc.ca/en/rss-feeds/cyber-centre-alerts-advisories.xml
-  category: Native
-  region: Canada
+# Disabled 2026-04-21: cccs-cccs.gc.ca domain no longer resolves (NXDOMAIN)
+# - url: https://www.cccs-cccs.gc.ca/en/rss-feeds/cyber-centre-alerts-advisories.xml
+#   category: Native
+#   region: Canada
 
 # CERT-UA — Ukraine national CERT, ground-truth for Russian APT activity (Sandworm, APT28)
 - url: https://cert.gov.ua/api/articles/rss
@@ -295,9 +297,10 @@
 # CERT-NZ advisory RSS returns 404 (verified 2026-03-14)
 
 # Tier 12: Industry Blogs & Analysis
-- url: https://www.sophos.com/en-us/blog.xml
-  category: Native
-  region: Global
+# Disabled 2026-04-21: sophos.com/en-us/blog.xml returns 404 (feed URL changed, no replacement found)
+# - url: https://www.sophos.com/en-us/blog.xml
+#   category: Native
+#   region: Global
 
 # Arctic Wolf — returns 404 (verified 2026-03-22)
 # - url: https://www.arcticwolf.com/resources/blog/feed/

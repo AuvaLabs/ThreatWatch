@@ -39,14 +39,11 @@ DARKWEB_SOURCES = [
         "parser": "_parse_ransomware_live",
         "description": "Ransomware victim posts from leak sites",
     },
-    # Disabled 2026-04-21: montysecurity/C2-Tracker repo archived, data files removed.
-    # {
-    #     "name": "github-iocs",
-    #     "url": "https://raw.githubusercontent.com/montysecurity/C2-Tracker/main/data/all.txt",
-    #     "type": "ioc_list",
-    #     "parser": "_parse_c2_tracker",
-    #     "description": "Active C2 server IPs",
-    # },
+    # C2-Tracker (montysecurity) removed 2026-04-21: repo archived.
+    # Feodo Tracker (abuse.ch) evaluated as replacement but has <5 active IPs.
+    # C2 signal now comes from ThreatFox IOCs above (covers C2 indicators
+    # alongside other malware IOCs). Re-evaluate if a high-volume C2 IP feed
+    # becomes available.
 ]
 
 # Known ransomware group .onion sites (for optional Tor monitoring)
