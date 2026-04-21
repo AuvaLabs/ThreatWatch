@@ -151,11 +151,10 @@ def read_cached(file_path):
 def load_articles():
     """Return the full article corpus as a list of dicts.
 
-    SQLite Phase 2: when READ_FROM_SQLITE=1, we pull from the shadow store
-    populated by output_writer.write_daily_output's dual-write, falling back
-    to the JSON file if the DB has fewer rows (e.g. first boot before
-    import_to_sqlite.py has run, or an ad-hoc tool wrote to JSON only).
-    JSON remains the source of truth until Phase 3 drops the dual-write.
+    SQLite Phase 3: READ_FROM_SQLITE=1 is active in production. SQLite is the
+    primary read source with a 7-day prune applied each pipeline run. JSON
+    files are kept as backup and provide the parity-check reference count.
+    Fallback to JSON triggers only if SQLite has >20% fewer rows than JSON.
     """
     if _READ_FROM_SQLITE:
         try:
