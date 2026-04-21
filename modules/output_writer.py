@@ -135,15 +135,17 @@ def write_hourly_output(articles):
 def write_daily_output(articles):
     date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     _write_json(articles, DAILY_DIR / f"{date}.json")
-    # Phase 1 of JSON->SQLite migration: dual-write every daily batch into
-    # SQLite so the DB shadows the JSON. Failure is non-fatal — the JSON
-    # write is still the source of truth until Phase 2 swaps the reads.
+    # SQLite write (Phase 3): upsert batch and prune to the same cutoff window
+    # used by the JSON merge. Server reads from SQLite (READ_FROM_SQLITE=1);
+    # JSON files below remain as backup and for the parity-check fallback.
     try:
-        from modules.db import upsert_articles
+        from modules.db import upsert_articles, prune_older_than
         n = upsert_articles(articles)
-        logger.debug(f"SQLite dual-write: {n} articles upserted")
+        cutoff_iso = (datetime.now(timezone.utc) - timedelta(days=FEED_CUTOFF_DAYS)).isoformat()
+        pruned = prune_older_than(cutoff_iso)
+        logger.debug(f"SQLite: {n} articles upserted, {pruned} pruned (cutoff={FEED_CUTOFF_DAYS}d)")
     except Exception as exc:
-        logger.warning(f"SQLite dual-write skipped: {exc}")
+        logger.warning(f"SQLite write skipped: {exc}")
     # Merge into rolling daily latest (keeps all articles within cutoff window)
     existing = load_existing(STATIC_DAILY)
     merged = _merge_articles(existing, articles)

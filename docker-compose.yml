@@ -40,6 +40,7 @@ services:
     environment:
       - PORT=${PORT:-8098}
       - SITE_DOMAIN=${SITE_DOMAIN:-localhost:8098}
+      - READ_FROM_SQLITE=1
     ports:
       - "${PORT:-8098}:8098"
     volumes:
