@@ -362,3 +362,66 @@
 - url: https://cyble.com/blog/feed/
   category: Native
   region: Global
+
+# ── New feeds added 2026-04-21 (verified live) ──────────────────────────
+
+# Tier 14: National CERTs (additions)
+- url: https://advisories.ncsc.nl/rss/advisories
+  category: Native
+  region: Europe
+
+- url: https://www.cert.se/feed/rss.xml
+  category: Native
+  region: Europe
+
+# Tier 15: Threat Intelligence Research
+- url: https://www.intel471.com/blog/feed
+  category: Native
+  region: Global
+
+- url: https://blog.sekoia.io/feed/
+  category: Native
+  region: Europe
+
+- url: https://flashpoint.io/blog/feed/
+  category: Native
+  region: Global
+
+- url: https://citizenlab.ca/feed/
+  category: Native
+  region: Global
+
+- url: https://intezer.com/feed/
+  category: Native
+  region: Global
+
+# Tier 16: ICS/OT & Specialized
+- url: https://ics-cert.kaspersky.com/feed/
+  category: Native
+  region: Global
+
+- url: https://www.netskope.com/blog/category/netskope-threat-labs/feed
+  category: Native
+  region: Global
+
+# Tier 17: Vulnerability Feeds
+- url: https://vulners.com/rss.xml
+  category: Native
+  region: Global
+
+- url: https://seclists.org/rss/fulldisclosure.rss
+  category: Native
+  region: Global
+
+# Tier 18: Additional Vendor Blogs
+- url: https://www.varonis.com/blog/rss.xml
+  category: Native
+  region: Global
+
+- url: https://www.imperva.com/blog/feed/
+  category: Native
+  region: Global
+
+- url: https://www.cybereason.com/blog/rss.xml
+  category: Native
+  region: Global
