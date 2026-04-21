@@ -12,7 +12,10 @@ import pytest
 import requests
 
 from modules import llm_client
-from modules.llm_client import call_llm, _response_format_unsupported
+from modules.llm_client import (
+    call_llm, _response_format_unsupported,
+    _next_api_key, _advance_key, _get_http_session, is_available,
+)
 
 
 def _mock_response(status_code=200, json_body=None, text=""):
@@ -212,3 +215,55 @@ class TestRateLimitFallthrough:
         # Every attempt included response_format (429 doesn't trigger fallback)
         for call in mock_session.post.call_args_list:
             assert call.kwargs["json"]["response_format"] == {"type": "json_object"}
+
+
+class TestNextApiKey:
+    def test_single_key(self, monkeypatch):
+        monkeypatch.setattr(llm_client, "LLM_API_KEYS", ["only-key"])
+        monkeypatch.setattr(llm_client, "LLM_API_KEY", "only-key")
+        assert _next_api_key() == "only-key"
+
+    def test_rotates_multiple_keys(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(llm_client, "LLM_API_KEYS", ["k1", "k2", "k3"])
+        monkeypatch.setattr(llm_client, "LLM_API_KEY", "k1")
+        monkeypatch.setattr(llm_client, "_key_index_path", tmp_path / ".idx")
+        k1 = _next_api_key()
+        k2 = _next_api_key()
+        k3 = _next_api_key()
+        assert {k1, k2, k3} == {"k1", "k2", "k3"}
+
+
+class TestAdvanceKey:
+    def test_advances_index(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(llm_client, "LLM_API_KEYS", ["k1", "k2"])
+        monkeypatch.setattr(llm_client, "_key_index_path", tmp_path / ".idx")
+        (tmp_path / ".idx").write_text("0")
+        _advance_key()
+        assert (tmp_path / ".idx").read_text() == "1"
+
+
+class TestGetHttpSession:
+    def test_returns_session_with_retry(self):
+        session = _get_http_session()
+        assert isinstance(session, requests.Session)
+        adapter = session.get_adapter("https://example.com")
+        assert adapter.max_retries.total == 3
+
+
+class TestIsAvailable:
+    def test_true_with_key(self, monkeypatch):
+        monkeypatch.setattr(llm_client, "LLM_API_KEY", "test-key")
+        assert is_available() is True
+
+    def test_false_without_key(self, monkeypatch):
+        monkeypatch.setattr(llm_client, "LLM_API_KEY", "")
+        assert is_available() is False
+
+
+class TestAllKeysExhausted:
+    def test_raises_runtime_error(self, mock_session, monkeypatch):
+        monkeypatch.setattr(llm_client, "LLM_API_KEYS", ["k1"])
+        rl = _mock_response(status_code=429, text="rate limited")
+        mock_session.post.return_value = rl
+        with pytest.raises(RuntimeError, match="exhausted"):
+            call_llm("x", system_prompt="y")
