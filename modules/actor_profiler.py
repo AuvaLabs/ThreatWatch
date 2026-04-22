@@ -3,10 +3,18 @@
 When a threat actor appears in articles, generates a brief profile covering
 origin, targets, TTPs, and recent activity. Profiles are cached permanently
 in state/actor_profiles.json — near-zero ongoing token cost.
+
+On top of the LLM-generated profile, each entry is enriched with **observed**
+MITRE ATT&CK techniques and tactics aggregated from the article corpus.
+`signature_ttps` is what the LLM describes; `observed_techniques` /
+`observed_tactics` are data-driven counts from the articles that actually
+mention the actor — grounding the profile in observable evidence so analysts
+can see which TTPs are backed by current reporting.
 """
 
 import json
 import logging
+from collections import Counter
 from datetime import datetime, timezone
 from typing import Any
 
@@ -21,6 +29,9 @@ PROFILES_PATH = STATE_DIR / "actor_profiles.json"
 _MIN_ARTICLES_FOR_PROFILE = 2
 # Max new profiles per pipeline run (controls token budget)
 _MAX_NEW_PROFILES_PER_RUN = 5
+# How many top techniques/tactics to surface on each profile
+_TOP_TECHNIQUES_PER_ACTOR = 8
+_TOP_TACTICS_PER_ACTOR = 6
 
 _PROFILE_PROMPT = """You are a cyber threat intelligence analyst. Generate a brief threat actor profile.
 
@@ -57,19 +68,44 @@ def _save_profiles(profiles: dict[str, Any]) -> None:
 
 
 def extract_actors_from_articles(articles: list[dict]) -> dict[str, dict]:
-    """Scan articles for known threat actors. Returns {actor_name: {type, origin, count}}."""
-    actor_counts = {}
+    """Scan articles for known threat actors.
+
+    Returns {actor_name: {type, origin, count, techniques: Counter, tactics: Counter}}.
+    ``techniques`` / ``tactics`` count occurrences of each ATT&CK technique
+    ID / tactic name across the articles that mention this actor, so
+    downstream code can surface the most-observed TTPs on the profile.
+    """
+    actor_counts: dict[str, dict] = {}
     for article in articles:
         text = (article.get("title", "") + " " + (article.get("summary") or ""))
+        techniques = article.get("attack_techniques") or []
+        tactics = article.get("attack_tactics") or []
         for pat, name, actor_type, origin in _ACTOR_PATTERNS:
             if pat.search(text):
-                if name not in actor_counts:
-                    actor_counts[name] = {
+                entry = actor_counts.get(name)
+                if entry is None:
+                    entry = {
                         "type": actor_type,
                         "origin": origin,
                         "count": 0,
+                        "techniques": Counter(),
+                        "tactics": Counter(),
                     }
-                actor_counts[name]["count"] += 1
+                    actor_counts[name] = entry
+                entry["count"] += 1
+                # Techniques are expected to be {"id": "T1566", "name": "..."}
+                # dicts from attack_tagger. Fall back gracefully for plain
+                # string IDs so older cached articles still contribute.
+                for t in techniques:
+                    if isinstance(t, dict):
+                        tid = t.get("id")
+                        if tid:
+                            entry["techniques"][tid] += 1
+                    elif isinstance(t, str):
+                        entry["techniques"][t] += 1
+                for tac in tactics:
+                    if isinstance(tac, str) and tac:
+                        entry["tactics"][tac] += 1
     return actor_counts
 
 
@@ -95,9 +131,15 @@ def generate_profiles(articles: list[dict[str, Any]]) -> dict[str, Any]:
     for actor_name, meta in sorted_actors:
         if meta["count"] < _MIN_ARTICLES_FOR_PROFILE:
             continue
+
+        observed = _top_observed_ttps(meta)
+
         if actor_name in profiles:
-            # Update the article count for existing profiles
+            # Update the article count and observed TTPs for existing
+            # profiles on every run — the LLM-generated description doesn't
+            # change but the evidence base keeps current.
             profiles[actor_name]["current_article_count"] = meta["count"]
+            profiles[actor_name].update(observed)
             continue
         if new_count >= _MAX_NEW_PROFILES_PER_RUN:
             break
@@ -106,6 +148,7 @@ def generate_profiles(articles: list[dict[str, Any]]) -> dict[str, Any]:
         if profile:
             profile["generated_at"] = datetime.now(timezone.utc).isoformat()
             profile["current_article_count"] = meta["count"]
+            profile.update(observed)
             profiles[actor_name] = profile
             new_count += 1
             logger.info(f"Generated profile for {actor_name}")
@@ -124,6 +167,33 @@ def generate_profiles(articles: list[dict[str, Any]]) -> dict[str, Any]:
         json.dump(profiles, f, ensure_ascii=False)
 
     return profiles
+
+
+def _top_observed_ttps(meta: dict) -> dict[str, list[dict] | list[str]]:
+    """Return the top-N ATT&CK techniques and tactics for an actor.
+
+    Shape matches what the frontend expects:
+    - observed_techniques: list of {"id": "T1566", "count": 3}
+    - observed_tactics: list of {"name": "Initial Access", "count": 3}
+    """
+    techniques = meta.get("techniques")
+    tactics = meta.get("tactics")
+    top_techniques = []
+    top_tactics = []
+    if isinstance(techniques, Counter):
+        top_techniques = [
+            {"id": tid, "count": c}
+            for tid, c in techniques.most_common(_TOP_TECHNIQUES_PER_ACTOR)
+        ]
+    if isinstance(tactics, Counter):
+        top_tactics = [
+            {"name": name, "count": c}
+            for name, c in tactics.most_common(_TOP_TACTICS_PER_ACTOR)
+        ]
+    return {
+        "observed_techniques": top_techniques,
+        "observed_tactics": top_tactics,
+    }
 
 
 def _generate_single_profile(actor_name: str, meta: dict) -> dict | None:
