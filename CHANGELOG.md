@@ -2,6 +2,22 @@
 
 All notable changes to ThreatWatch are documented here.
 
+## 2026-04-22 — Pipeline Runtime + AI Decoupling + ATT&CK on Actors
+
+### Fixed
+- **Briefing staleness alarm (`modules/briefing_generator.py`)**: `generated_at` was stamped at function entry rather than at save time. Under Groq rate-limit backoff the LLM call could block for 100+ min, so every saved briefing looked hours old the moment it hit disk and tripped the staleness alarm immediately. Now stamped at save time across all three paths (fresh generation, cache hit, regional).
+- **Abandoned feed_health entries (`serve_threatwatch.build_health`)**: feeds disabled in config lingered in `feed_health.json` with their final error status and inflated the `/api/health` error count. Now only counts entries checked within the last 24h.
+
+### Performance
+- **LLM circuit breaker + timeout tightening (`modules/llm_client.py`)**: runs were taking 3–5+ hours each on the VPS vs. the intended 10-min interval. Root cause: `urllib3.Retry(status_forcelist=[500,502,503,504])` with default `respect_retry_after_header=True` — a single Groq 503 with a long `Retry-After` cascaded into hours of blocked time across retries × keys × per-run LLM calls. Removed urllib3 retry entirely; added explicit 5xx/Timeout/ConnectionError handling that rotates keys without retry; tightened default timeout 90s → 30s (`LLM_TIMEOUT`); added a process-local circuit breaker (`LLM_CIRCUIT_THRESHOLD=3`) that short-circuits remaining calls after N consecutive failures in a run. Verified: one run went 341 min → 45 min.
+
+### Added
+- **Decoupled AI enrichment architecture**: the four AI tiers (global briefing, regional digests, top stories, article summaries) now live in `modules/ai_enrichment.py` and run out-of-band via `scripts/run_ai_enrichment.py`. `scripts/run_pipeline.py` invokes AI every `AI_ENRICHMENT_EVERY` pipeline ticks (default 3 = ~30 min) independent of the 10-min fetch loop. `AI_ENRICHMENT_INLINE=0` (new default) skips inline AI; set to `1` to restore legacy inline behaviour. Fetch pipeline is no longer blocked by Groq rate limits.
+- **ATT&CK on actor profiles (`modules/actor_profiler.py`)**: every profile now carries `observed_techniques: [{id, count}]` and `observed_tactics: [{name, count}]` aggregated from articles mentioning the actor. Refreshed every run for both new and existing profiles, grounding the LLM-generated `signature_ttps` narrative in data-driven evidence.
+
+### Testing
+- 1204 tests / 95% coverage (modules/) — up from 1141 / 92%. +63 tests across 13 modules, concentrated on the new circuit-breaker paths, decoupling orchestrator, actor ATT&CK aggregation, and long-standing coverage gaps in `feed_health`, `trend_detector`, `briefing_health`, `nvd_fetcher`, and `newsapi_fetcher`.
+
 ## 2026-04-21 — CTI Platform + Security Hardening + SQLite Migration
 
 ### Added
