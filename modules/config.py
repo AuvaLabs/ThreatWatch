@@ -80,7 +80,12 @@ SYSTEM_PROMPT = (
 )
 
 MAX_CONTENT_CHARS = 4000
-MAX_SCRAPER_THREADS = 8
+MAX_SCRAPER_THREADS = int(os.environ.get("MAX_SCRAPER_THREADS", "16"))
+# Parallel feed fetchers. 164 feeds / 16 workers ≈ 10 feeds per worker;
+# each worker holds one connection pool so raising this stays polite to
+# individual domains. Old default (8) was the dominant bottleneck when
+# a few slow feeds serialised the tail of the run.
+MAX_FEED_FETCH_THREADS = int(os.environ.get("MAX_FEED_FETCH_THREADS", "16"))
 FUZZY_DEDUP_THRESHOLD = 0.55  # word-shingle overlap (lowered from 0.6 to catch more near-dupes)
 MAX_SEEN_TITLES = 10000
 MAX_SEEN_HASHES = 50000

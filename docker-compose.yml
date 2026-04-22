@@ -19,6 +19,14 @@ services:
       - AI_ENRICHMENT_EVERY=${AI_ENRICHMENT_EVERY:-3}
       - LLM_TIMEOUT=${LLM_TIMEOUT:-30}
       - LLM_CIRCUIT_THRESHOLD=${LLM_CIRCUIT_THRESHOLD:-3}
+      # Fetch parallelism. Raising to 16 (from 8) roughly halves the
+      # critical-path tail of slow feed tails that used to serialise
+      # behind a small pool.
+      - MAX_FEED_FETCH_THREADS=${MAX_FEED_FETCH_THREADS:-16}
+      - MAX_SCRAPER_THREADS=${MAX_SCRAPER_THREADS:-16}
+      # URL-resolver HTTP timeouts tuned for news sites (not LLM APIs).
+      - URL_RESOLVER_REDIRECT_TIMEOUT=${URL_RESOLVER_REDIRECT_TIMEOUT:-3}
+      - URL_RESOLVER_CANONICAL_TIMEOUT=${URL_RESOLVER_CANONICAL_TIMEOUT:-5}
       - WEBHOOK_URL=${WEBHOOK_URL:-}
       - WEBHOOK_MIN_CONF=${WEBHOOK_MIN_CONF:-80}
       - NEWSAPI_KEY=${NEWSAPI_KEY:-}

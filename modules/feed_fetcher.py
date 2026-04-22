@@ -112,8 +112,9 @@ def _fetch_feed(url: str, region: str = "Global") -> list[dict[str, Any]]:
 
 
 def fetch_articles(feeds_config: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    from modules.config import MAX_FEED_FETCH_THREADS
     all_articles = []
-    with ThreadPoolExecutor(max_workers=8) as executor:
+    with ThreadPoolExecutor(max_workers=MAX_FEED_FETCH_THREADS) as executor:
         futures = {
             executor.submit(_fetch_feed, feed["url"], feed.get("region", "Global")): feed["url"]
             for feed in feeds_config

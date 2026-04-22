@@ -2,6 +2,7 @@
 import base64
 import ipaddress
 import logging
+import os
 import re
 import socket
 import threading
@@ -9,6 +10,15 @@ import threading
 import requests
 
 logger = logging.getLogger(__name__)
+
+# URL resolution runs per-article inside feed parsing and inside the
+# scraper. Timeouts here dominate the fetch tail when a small number of
+# slow hosts (sophos, sentinelone) time out on every article. Defaults
+# tightened from 5s/8s to 3s/5s — Groq-style timeouts were tuned for
+# LLM calls; HTTP HEAD/GET to news sites should be much tighter. Tunable
+# so we can loosen for slow networks without a code change.
+_REDIRECT_TIMEOUT = float(os.environ.get("URL_RESOLVER_REDIRECT_TIMEOUT", "3"))
+_CANONICAL_TIMEOUT = float(os.environ.get("URL_RESOLVER_CANONICAL_TIMEOUT", "5"))
 from urllib.parse import urlparse, parse_qs
 from bs4 import BeautifulSoup
 
@@ -117,7 +127,7 @@ def follow_redirects(url):
         logger.debug(f"follow_redirects: blocked unsafe URL {url}")
         return None
     try:
-        response = requests.head(url, allow_redirects=True, timeout=5)
+        response = requests.head(url, allow_redirects=True, timeout=_REDIRECT_TIMEOUT)
         if response.status_code in [301, 302] and 'Location' in response.headers:
             return response.headers['Location']
         final = response.url
@@ -134,7 +144,7 @@ def extract_canonical_from_html(url):
         return url
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
-        resp = requests.get(url, headers=headers, timeout=8)
+        resp = requests.get(url, headers=headers, timeout=_CANONICAL_TIMEOUT)
         soup = BeautifulSoup(resp.text, 'html.parser')
         canonical = soup.find('link', rel='canonical')
         if canonical and canonical.get('href'):
