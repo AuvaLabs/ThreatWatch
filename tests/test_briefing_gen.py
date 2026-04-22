@@ -219,7 +219,11 @@ class TestGenerateBriefing:
              patch.object(bg, "_save_briefing"), \
              patch.object(bg, "BRIEFING_PATH", tmp_path / "briefing.json"):
             result = bg.generate_briefing(self._articles())
-        assert result == cached
+        # Cache hit re-stamps generated_at so the staleness alarm stays accurate
+        # across runs even when the digest is unchanged.
+        assert result["threat_level"] == "MODERATE"
+        assert result["what_happened"] == "cached"
+        assert "generated_at" in result
 
     def test_rate_limited_serves_existing(self, tmp_path):
         existing = {"threat_level": "ELEVATED", "what_happened": "old"}
@@ -253,6 +257,45 @@ class TestGenerateBriefing:
         assert result["threat_level"] == "ELEVATED"
         assert "source_articles" in result
         assert result["provider"] == "openai/test-model"
+
+    def test_generated_at_stamped_after_llm_call(self, tmp_path):
+        """generated_at must be stamped AFTER the LLM call returns, not before.
+
+        Groq free-tier calls can block for many minutes; stamping at function
+        entry produces a timestamp hours older than the actual save, tripping
+        the staleness alarm the moment the briefing hits disk.
+        """
+        from datetime import datetime, timezone, timedelta
+        llm_reply = json.dumps({
+            "threat_level": "MODERATE",
+            "what_happened": "Test incident.",
+        })
+        # Simulate a slow LLM call by advancing time during the call.
+        call_start = datetime(2026, 1, 1, 10, 0, 0, tzinfo=timezone.utc)
+        call_end = call_start + timedelta(minutes=107)
+        clock = iter([call_start, call_end])
+
+        def _slow_call(*_a, **_k):
+            # Patch datetime.now inside briefing_generator to advance on call.
+            return llm_reply
+
+        with patch.object(bg, "_detect_provider", return_value="openai"), \
+             patch.object(bg, "get_cached_result", return_value=None), \
+             patch.object(bg, "_is_rate_limited", return_value=False), \
+             patch.object(bg, "_call_openai_compatible", side_effect=_slow_call), \
+             patch.object(bg, "_parse_json", return_value=json.loads(llm_reply)), \
+             patch.object(bg, "_record_api_call"), \
+             patch.object(bg, "cache_result"), \
+             patch.object(bg, "_save_briefing"), \
+             patch.object(bg, "LLM_MODEL", "m"), \
+             patch.object(bg, "_build_trend_context", return_value=""), \
+             patch.object(bg, "_build_vuln_context", return_value=""), \
+             patch("modules.briefing_generator.datetime") as mock_dt:
+            mock_dt.now.side_effect = lambda tz=None: next(clock)
+            mock_dt.side_effect = lambda *a, **k: datetime(*a, **k)
+            result = bg.generate_briefing(self._articles())
+        # generated_at must reflect the post-call time, not the pre-call time.
+        assert result["generated_at"] == call_end.isoformat()
 
     def test_legacy_field_mapping(self, tmp_path):
         """Legacy LLM responses with old field names should be normalized."""

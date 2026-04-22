@@ -13,7 +13,7 @@ import secrets
 import sys
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.utils import formatdate
 from http import HTTPStatus
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -576,10 +576,25 @@ def build_health() -> bytes:
 
     feed_summary: dict[str, int] = {}
     feed_health_path = BASE_DIR / "data" / "state" / "feed_health.json"
+    # Only count feeds that were actually checked in the last 24h. Entries for
+    # feeds disabled in config linger in feed_health.json with their last error
+    # status forever and otherwise inflate the error count on /api/health.
+    cutoff = datetime.now(timezone.utc) - timedelta(days=1)
     try:
         fh_raw = feed_health_path.read_bytes()
         fh_data = json.loads(fh_raw)
         for entry in fh_data.values():
+            last = entry.get("last_checked")
+            if not last:
+                continue
+            try:
+                dt = datetime.fromisoformat(str(last).replace("Z", "+00:00"))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+            except ValueError:
+                continue
+            if dt < cutoff:
+                continue
             s = entry.get("status", "ok")
             feed_summary[s] = feed_summary.get(s, 0) + 1
     except (FileNotFoundError, json.JSONDecodeError):
