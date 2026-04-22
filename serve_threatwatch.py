@@ -1147,6 +1147,22 @@ class ThreatWatchHandler(BaseHTTPRequestHandler):
             self._send_body("application/json; charset=utf-8", body, head_only)
             return
 
+        # Route: /api/groq-usage — per-key / per-caller LLM usage today.
+        # Reads data/state/groq_usage.json populated by modules/groq_usage.
+        # Useful for spotting which Groq key is closest to its daily cap and
+        # which caller (briefing / classify / summaries …) is eating budget.
+        if path == "/api/groq-usage":
+            try:
+                from modules.groq_usage import get_usage_summary
+                payload = get_usage_summary()
+                body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            except Exception as exc:
+                logger.error("Groq usage error: %s", exc)
+                self._send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, "Groq usage failed")
+                return
+            self._send_body("application/json; charset=utf-8", body, head_only)
+            return
+
         # Route: /api/trends — threat trend data and spike detection
         if path == "/api/trends":
             try:

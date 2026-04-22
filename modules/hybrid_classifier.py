@@ -81,7 +81,7 @@ def _classify_via_groq(title, content=None):
         cached["_cached"] = True
         return cached
 
-    reply = call_llm(user_content, system_prompt=SYSTEM_PROMPT, max_tokens=300)
+    reply = call_llm(user_content, system_prompt=SYSTEM_PROMPT, max_tokens=300, caller="classify")
     result = extract_json(reply)
     if result and "is_cyber_attack" in result:
         cache_result(cache_key, result)

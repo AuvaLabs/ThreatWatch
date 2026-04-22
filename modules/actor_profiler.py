@@ -210,6 +210,7 @@ def _generate_single_profile(actor_name: str, meta: dict) -> dict | None:
             user_content=f"Threat actor: {actor_name}\nType: {meta['type']}\nAttribution: {meta['origin']}",
             system_prompt=_PROFILE_PROMPT,
             max_tokens=400,
+            caller="actor_profile",
         )
         profile = extract_json(reply)
         if profile and "name" in profile:

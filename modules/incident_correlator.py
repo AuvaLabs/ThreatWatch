@@ -247,6 +247,7 @@ def _synthesize_clusters(clusters: list[dict]) -> None:
                         "or story do they collectively represent? Be specific and factual."
                     ),
                     max_tokens=150,
+                    caller="cluster_synth",
                 )
                 cluster["synthesis"] = reply.strip()
                 cache_result(cache_key, reply.strip())
