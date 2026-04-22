@@ -359,6 +359,11 @@ def generate_briefing(articles: list[dict[str, Any]]) -> dict[str, Any] | None:
     cached = get_cached_result(cache_key)
     if cached is not None:
         logger.info("Intelligence briefing loaded from cache.")
+        # Re-stamp generated_at: the digest is unchanged, so the analysis is
+        # still current. Without this, a run-to-run cache hit keeps the old
+        # timestamp and the staleness alarm fires even though the pipeline is
+        # healthy and the content is valid.
+        cached = {**cached, "generated_at": datetime.now(timezone.utc).isoformat()}
         _save_briefing(cached)
         return cached
 
@@ -452,7 +457,11 @@ def generate_briefing(articles: list[dict[str, Any]]) -> dict[str, Any] | None:
             })
         briefing["source_articles"] = source_map
 
-        briefing["generated_at"] = now.isoformat()
+        # Stamp generated_at at save time, not function entry. The LLM call above
+        # can block for a long time under rate-limit backoff; using the pre-call
+        # `now` made the briefing look hours old the moment it hit disk and
+        # tripped the staleness alarm immediately on save.
+        briefing["generated_at"] = datetime.now(timezone.utc).isoformat()
         briefing["articles_analyzed"] = min(len(briefing_articles), _MAX_DIGEST_ARTICLES)
         briefing["total_articles"] = len(articles)  # total including darkweb
         briefing["reporting_window"] = reporting_window
@@ -646,7 +655,7 @@ def generate_regional_briefings(articles: list[dict[str, Any]]) -> dict[str, Any
                     "source_name": a.get("source_name", ""),
                 })
             briefing["source_articles"] = source_map
-            briefing["generated_at"] = now.isoformat()
+            briefing["generated_at"] = datetime.now(timezone.utc).isoformat()
             briefing["region"] = region_key
             briefing["region_name"] = region_name
             briefing["articles_analyzed"] = len(briefing_articles)

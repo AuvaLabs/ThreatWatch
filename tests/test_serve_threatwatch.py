@@ -212,11 +212,17 @@ class TestHealthEndpoint:
         assert data["articles_total"] == 0
 
     def test_health_includes_feed_summary(self, tmp_path):
+        from datetime import datetime, timezone
         state_dir = tmp_path / "data" / "state"
         state_dir.mkdir(parents=True)
+        # last_checked is required for entries to count — feeds without a
+        # recent check are treated as disabled and excluded from the health
+        # summary (prevents abandoned feed_health entries from inflating
+        # error counts).
+        now_iso = datetime.now(timezone.utc).isoformat()
         fh_data = {
-            "https://a.example.com": {"status": "ok"},
-            "https://b.example.com": {"status": "dead"},
+            "https://a.example.com": {"status": "ok", "last_checked": now_iso},
+            "https://b.example.com": {"status": "dead", "last_checked": now_iso},
         }
         (state_dir / "feed_health.json").write_text(json.dumps(fh_data))
         with patch("serve_threatwatch.load_stats", return_value={}), \
@@ -225,6 +231,31 @@ class TestHealthEndpoint:
         data = json.loads(body)
         assert data["feed_health"].get("ok", 0) == 1
         assert data["feed_health"].get("dead", 0) == 1
+
+    def test_health_excludes_abandoned_feeds(self, tmp_path):
+        """Feeds not checked in >24h (e.g. disabled in config) don't count."""
+        from datetime import datetime, timezone, timedelta
+        state_dir = tmp_path / "data" / "state"
+        state_dir.mkdir(parents=True)
+        now = datetime.now(timezone.utc)
+        fh_data = {
+            "https://recent-ok.example.com": {
+                "status": "ok",
+                "last_checked": now.isoformat(),
+            },
+            "https://abandoned-error.example.com": {
+                "status": "error",
+                "last_checked": (now - timedelta(days=5)).isoformat(),
+            },
+            "https://never-checked.example.com": {"status": "ok"},
+        }
+        (state_dir / "feed_health.json").write_text(json.dumps(fh_data))
+        with patch("serve_threatwatch.load_stats", return_value={}), \
+             patch("serve_threatwatch.BASE_DIR", tmp_path):
+            body = sw.build_health()
+        data = json.loads(body)
+        assert data["feed_health"].get("ok", 0) == 1
+        assert data["feed_health"].get("error", 0) == 0
 
 
 # ── render_page XSS guard ─────────────────────────────────────────────────────
