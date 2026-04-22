@@ -4,7 +4,7 @@
 
 ## Features
 
-- **Live Threat Intelligence Feed** — 155+ RSS/API sources, filtered by category (breach, ransomware, APT, phishing, malware, zero-day, vuln, dark web) and region; confidence score badge with hover tooltip explaining classification drivers
+- **Live Threat Intelligence Feed** — 164 RSS/API sources, filtered by category (breach, ransomware, APT, phishing, malware, zero-day, vuln, dark web) and region; confidence score badge with hover tooltip explaining classification drivers
 - **Threat Intelligence Briefing** — zero-cost rule-based briefing + optional AI-generated executive summary via any OpenAI-compatible LLM provider (default: Groq free tier)
 - **Campaign Tracker** — stable UUIDs for persistent incident campaigns with active/dormant/archived status
 - **Incident Clustering** — auto-groups related articles by CVE, threat actor, or organization with AI-synthesized narratives
@@ -30,6 +30,7 @@
 - Data pipeline: `threatdigest_main.py` orchestrating 20+ modules
 - Docker Compose two-service deployment (pipeline + server)
 - SQLite database (primary) + flat JSON (fallback)
+- 1141 tests, 92% coverage
 
 ## Architecture
 
@@ -43,7 +44,7 @@ Browser → serve_threatwatch.py (SSR injection)
         SQLite DB (data/output/threatwatch.db) + JSON fallback
                 ↓
         threatdigest_main.py (pipeline)
-        ├── feed_fetcher.py        (155+ RSS feeds, 8-thread parallel)
+        ├── feed_fetcher.py        (164 RSS feeds, 8-thread parallel)
         ├── newsapi_fetcher.py     (NewsAPI security news)
         ├── darkweb_monitor.py     (ThreatFox, ransomware.live)
         ├── deduplicator.py        (fuzzy word-shingle dedup)
@@ -66,4 +67,4 @@ Browser → serve_threatwatch.py (SSR injection)
 - **GitHub Pages**: https://auvalabs.github.io/threatwatch/
 - **Repository**: https://github.com/AuvaLabs/threatwatch
 
-Last updated: 2026-04-21
+Last updated: 2026-04-22
