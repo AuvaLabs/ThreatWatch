@@ -14,9 +14,17 @@ All notable changes to ThreatWatch are documented here.
 ### Added
 - **Decoupled AI enrichment architecture**: the four AI tiers (global briefing, regional digests, top stories, article summaries) now live in `modules/ai_enrichment.py` and run out-of-band via `scripts/run_ai_enrichment.py`. `scripts/run_pipeline.py` invokes AI every `AI_ENRICHMENT_EVERY` pipeline ticks (default 3 = ~30 min) independent of the 10-min fetch loop. `AI_ENRICHMENT_INLINE=0` (new default) skips inline AI; set to `1` to restore legacy inline behaviour. Fetch pipeline is no longer blocked by Groq rate limits.
 - **ATT&CK on actor profiles (`modules/actor_profiler.py`)**: every profile now carries `observed_techniques: [{id, count}]` and `observed_tactics: [{name, count}]` aggregated from articles mentioning the actor. Refreshed every run for both new and existing profiles, grounding the LLM-generated `signature_ttps` narrative in data-driven evidence.
+- **ATT&CK on dashboard (`threatwatch.html`)**: actor spotlight cards render the top 3 observed techniques as compact accent-coloured pills (`T1566×3 T1486×2`); hover tooltip appends observed tactics. Falls back to the LLM-described `signature_ttps` line when observed data isn't present so the card stays functional for older profiles. 9/17 live actors now carry evidence-backed TTPs.
+- **Briefing threat-level webhook alerts (`modules/webhook.py`)**: `dispatch_briefing_alert(briefing)` fires when the global briefing's `threat_level` is at or above `WEBHOOK_BRIEFING_MIN_LEVEL` (default ELEVATED). Deduplicated by level-change + `WEBHOOK_BRIEFING_COOLDOWN_HOURS` (default 6h) so the same level doesn't re-alert every tick. Slack/Discord payload uses level-appropriate emojis and includes up to 3 priority actions; generic JSON payload carries the full structured fields. Wired into the AI enrichment orchestrator.
+
+### Fixed
+- **Actor profiler schema mismatch (hotfix)**: `actor_profiler.extract_actors_from_articles` was reading `t.get("id")` but `attack_tagger` emits `{technique_id, technique_name, tactic}` dicts — caused zero `observed_techniques` on the live API despite 535/2184 articles carrying ATT&CK tags. Now reads `technique_id` first, falls back to `id` for forward-compat. Regression-locked with a test that uses the real attack_tagger schema.
+
+### Performance
+- **Fetch concurrency + URL-resolver timeouts**: `MAX_FEED_FETCH_THREADS` and `MAX_SCRAPER_THREADS` both 8 → 16 (env-tunable). URL resolver HEAD timeout 5s → 3s (`URL_RESOLVER_REDIRECT_TIMEOUT`), GET 8s → 5s (`URL_RESOLVER_CANONICAL_TIMEOUT`). News-site timeouts were inherited from LLM-call defaults and too generous for the actual latency profile.
 
 ### Testing
-- 1204 tests / 95% coverage (modules/) — up from 1141 / 92%. +63 tests across 13 modules, concentrated on the new circuit-breaker paths, decoupling orchestrator, actor ATT&CK aggregation, and long-standing coverage gaps in `feed_health`, `trend_detector`, `briefing_health`, `nvd_fetcher`, and `newsapi_fetcher`.
+- 1216 tests / 95% coverage (modules/) — up from 1141 / 92%. +75 tests across 14 modules, concentrated on the new circuit-breaker paths, decoupling orchestrator, actor ATT&CK aggregation, briefing alert thresholds + cooldown, and long-standing coverage gaps in `feed_health`, `trend_detector`, `briefing_health`, `nvd_fetcher`, and `newsapi_fetcher`.
 
 ## 2026-04-21 — CTI Platform + Security Hardening + SQLite Migration
 
