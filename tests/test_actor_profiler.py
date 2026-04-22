@@ -151,3 +151,101 @@ class TestLoadProfilesPublic:
              patch.object(ap, "PROFILES_PATH", state_path):
             result = load_profiles()
         assert "LockBit" in result
+
+
+class TestObservedTTPs:
+    """Actor profiles surface the top ATT&CK techniques/tactics observed
+    in articles mentioning the actor, grounding LLM narratives in data."""
+
+    def test_techniques_aggregated_per_actor(self):
+        articles = [
+            {
+                "title": "LockBit hit hospital",
+                "summary": "",
+                "attack_techniques": [
+                    {"id": "T1566", "name": "Phishing"},
+                    {"id": "T1486", "name": "Data Encrypted for Impact"},
+                ],
+                "attack_tactics": ["Initial Access", "Impact"],
+            },
+            {
+                "title": "LockBit affiliate breaches firm",
+                "summary": "",
+                "attack_techniques": [{"id": "T1566", "name": "Phishing"}],
+                "attack_tactics": ["Initial Access"],
+            },
+        ]
+        actors = extract_actors_from_articles(articles)
+        assert actors["LockBit"]["techniques"]["T1566"] == 2
+        assert actors["LockBit"]["techniques"]["T1486"] == 1
+        assert actors["LockBit"]["tactics"]["Initial Access"] == 2
+
+    def test_technique_string_ids_also_counted(self):
+        """Older cached articles may have plain string IDs — shouldn't break."""
+        articles = [
+            {"title": "LockBit a", "summary": "", "attack_techniques": ["T1566"]},
+            {"title": "LockBit b", "summary": "", "attack_techniques": ["T1566"]},
+        ]
+        actors = extract_actors_from_articles(articles)
+        assert actors["LockBit"]["techniques"]["T1566"] == 2
+
+    def test_new_profile_gets_observed_ttps_stamped(self, tmp_path):
+        profiles_path = tmp_path / "state" / "profiles.json"
+        output_path = tmp_path / "output"
+        articles = [
+            {
+                "title": "LockBit a", "summary": "",
+                "attack_techniques": [{"id": "T1486"}],
+                "attack_tactics": ["Impact"],
+            },
+            {
+                "title": "LockBit b", "summary": "",
+                "attack_techniques": [{"id": "T1486"}],
+                "attack_tactics": ["Impact"],
+            },
+        ]
+        mock_profile = {
+            "name": "LockBit",
+            "origin": "Russia",
+            "type": "Ransomware-as-a-Service",
+            "description": "Test",
+        }
+        with patch.object(ap, "PROFILES_PATH", profiles_path), \
+             patch.object(ap, "OUTPUT_DIR", output_path), \
+             patch("modules.actor_profiler._generate_single_profile", return_value=mock_profile):
+            result = generate_profiles(articles)
+        assert result["LockBit"]["observed_techniques"] == [{"id": "T1486", "count": 2}]
+        assert result["LockBit"]["observed_tactics"] == [{"name": "Impact", "count": 2}]
+
+    def test_existing_profile_observed_ttps_refreshed(self, tmp_path):
+        """Existing profiles must pick up current observations every run so
+        the evidence base reflects this week's reporting, not last week's."""
+        profiles_path = tmp_path / "state" / "profiles.json"
+        output_path = tmp_path / "output"
+        # Seed with a profile that has stale observed data.
+        existing = {
+            "LockBit": {
+                "name": "LockBit",
+                "observed_techniques": [{"id": "T9999", "count": 99}],
+                "observed_tactics": [{"name": "Old", "count": 99}],
+            }
+        }
+        profiles_path.parent.mkdir(parents=True, exist_ok=True)
+        profiles_path.write_text(json.dumps(existing))
+        articles = [
+            {
+                "title": "LockBit a", "summary": "",
+                "attack_techniques": [{"id": "T1566"}],
+                "attack_tactics": ["Initial Access"],
+            },
+            {
+                "title": "LockBit b", "summary": "",
+                "attack_techniques": [{"id": "T1566"}],
+                "attack_tactics": ["Initial Access"],
+            },
+        ]
+        with patch.object(ap, "PROFILES_PATH", profiles_path), \
+             patch.object(ap, "OUTPUT_DIR", output_path):
+            result = generate_profiles(articles)
+        assert result["LockBit"]["observed_techniques"] == [{"id": "T1566", "count": 2}]
+        assert result["LockBit"]["observed_tactics"] == [{"name": "Initial Access", "count": 2}]
