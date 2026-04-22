@@ -30,8 +30,10 @@
 - Data pipeline: `threatdigest_main.py` orchestrating 20+ modules
 - Docker Compose two-service deployment (pipeline + server)
 - SQLite database (primary) + flat JSON (fallback)
-- 1204 tests, 95% coverage (modules/)
+- 1216 tests, 95% coverage (modules/)
 - Decoupled AI enrichment: fetch pipeline (10-min) and AI pipeline (30-min) run on independent schedules; LLM circuit breaker + explicit timeout caps cascade failures
+- ATT&CK-grounded actor profiles: observed techniques/tactics aggregated from articles mentioning the actor, refreshed every run
+- Briefing threat-level webhook alerts with level-change + 6h cooldown deduplication (Slack/Discord/generic)
 
 ## Architecture
 
