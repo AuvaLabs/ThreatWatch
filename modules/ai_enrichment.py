@@ -50,10 +50,21 @@ def run_ai_enrichment(
     )
 
     # Tier 1: Global intelligence digest (rate-limited to ~1x/hour by module)
+    briefing = None
     try:
-        generate_briefing(all_articles)
+        briefing = generate_briefing(all_articles)
     except Exception as e:
         logger.warning(f"Global briefing failed: {e}")
+
+    # Fire a webhook alert if the briefing's threat_level clears the configured
+    # minimum. Deduplicated by modules/webhook._should_alert_briefing so the
+    # same level doesn't re-alert every run. Guarded — alert failures must
+    # never abort the rest of enrichment.
+    try:
+        from modules.webhook import dispatch_briefing_alert
+        dispatch_briefing_alert(briefing)
+    except Exception as e:
+        logger.warning(f"Briefing alert dispatch failed: {e}")
 
     # Tier 1b: Regional digests — NA, EMEA, APAC
     try:
