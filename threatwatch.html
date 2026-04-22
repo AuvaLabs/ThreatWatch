@@ -3612,9 +3612,32 @@ function renderActorSpotlight(items, allText) {
                       actor.type === 'Botnet' ? 'var(--purple)' : 'var(--text-muted)';
     // Add AI profile tooltip if available
     const profile = state.actorProfiles ? state.actorProfiles[actor.name] : null;
-    const profileTip = profile && profile.description ? escapeHTML(profile.description).slice(0, 200) : '';
-    const ttps = profile && profile.signature_ttps ? profile.signature_ttps.slice(0, 2).join(', ') : '';
-    const profileLine = ttps ? `<div style="font-size:8px;color:var(--text-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHTML(ttps)}</div>` : '';
+    // Observed ATT&CK data aggregated from articles mentioning this actor
+    // (see modules/actor_profiler.extract_actors_from_articles).
+    const obsTechniques = profile && Array.isArray(profile.observed_techniques)
+      ? profile.observed_techniques.slice(0, 3) : [];
+    const obsTactics = profile && Array.isArray(profile.observed_tactics)
+      ? profile.observed_tactics.slice(0, 3) : [];
+
+    // Prefer data-driven observed techniques when present; fall back to
+    // LLM-described signature_ttps otherwise.
+    let profileLine = '';
+    if (obsTechniques.length > 0) {
+      const techStr = obsTechniques.map(t => `${t.id}×${t.count}`).join(' ');
+      profileLine = `<div class="actor-ttps" style="font-size:8px;color:var(--accent);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--font-mono)">${escapeHTML(techStr)}</div>`;
+    } else if (profile && profile.signature_ttps) {
+      const ttps = profile.signature_ttps.slice(0, 2).join(', ');
+      profileLine = `<div style="font-size:8px;color:var(--text-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHTML(ttps)}</div>`;
+    }
+
+    // Build a richer tooltip: description + observed tactics so analysts can
+    // see the evidence base without opening a detail view.
+    const tipParts = [];
+    if (profile && profile.description) tipParts.push(profile.description.slice(0, 200));
+    if (obsTactics.length > 0) {
+      tipParts.push('Observed tactics: ' + obsTactics.map(t => `${t.name} (${t.count})`).join(', '));
+    }
+    const profileTip = tipParts.length > 0 ? escapeHTML(tipParts.join(' — ')) : '';
 
     return `<div class="actor-tag${isActive ? ' active' : ''}" data-click-action="toggleActorFilter" data-click-args="[${actor.idx}]" title="${profileTip}">
       <div>
