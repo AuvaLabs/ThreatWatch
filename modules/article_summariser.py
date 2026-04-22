@@ -100,6 +100,7 @@ def summarize_articles(articles: list[dict[str, Any]]) -> int:
                     user_content,
                     system_prompt=_SUMMARY_PROMPT,
                     max_tokens=800,
+                    caller="summaries",
                 )
                 summaries = _parse_json(reply)
                 if summaries is None:

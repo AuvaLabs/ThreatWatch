@@ -172,6 +172,7 @@ def generate_top_stories(articles: list[dict[str, Any]]) -> list[dict[str, Any]]
             user_content,
             system_prompt=_TOP_STORIES_PROMPT,
             max_tokens=1500,
+            caller="top_stories",
         )
         result = _parse_json(reply)
         if not result or "top_stories" not in result:

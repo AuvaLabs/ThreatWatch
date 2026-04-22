@@ -107,7 +107,8 @@ def _response_format_unsupported(resp: requests.Response) -> bool:
 
 def call_llm(user_content: str, system_prompt: str,
              max_tokens: int = 2000,
-             response_format: dict | None = None) -> str:
+             response_format: dict | None = None,
+             caller: str | None = None) -> str:
     """Call Groq/OpenAI-compatible API with smart key failover on 429s.
 
     Args:
@@ -192,6 +193,16 @@ def call_llm(user_content: str, system_prompt: str,
                 resp.raise_for_status()
                 data = resp.json()
                 _record_success()
+                # Usage tracking is pure observability — guard so a bug
+                # in groq_usage can't break any LLM call. The response
+                # body carries OpenAI-style {"usage": {"prompt_tokens",
+                # "completion_tokens", "total_tokens"}} which we record
+                # per-key and per-caller in data/state/groq_usage.json.
+                try:
+                    from modules.groq_usage import record_usage
+                    record_usage(api_key, data, caller=caller)
+                except Exception as _e:
+                    logger.debug("groq_usage record failed: %s", _e)
                 return data["choices"][0]["message"]["content"].strip()
             except requests.exceptions.HTTPError as e:
                 if e.response is not None and e.response.status_code == 429:

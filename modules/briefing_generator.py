@@ -217,7 +217,8 @@ def _compute_reporting_window(articles: list[dict[str, Any]]) -> str:
 
 
 def _call_openai_compatible(user_content: str, system_prompt: str = None,
-                            max_tokens: int = 2000) -> str:
+                            max_tokens: int = 2000,
+                            caller: str | None = None) -> str:
     """Call Groq/OpenAI-compatible API via shared llm_client.
 
     All briefing callers expect strict JSON back, so we opt into Groq's
@@ -231,6 +232,7 @@ def _call_openai_compatible(user_content: str, system_prompt: str = None,
         system_prompt=system_prompt or _BRIEFING_PROMPT,
         max_tokens=max_tokens,
         response_format={"type": "json_object"},
+        caller=caller,
     )
 
 
@@ -400,7 +402,7 @@ def generate_briefing(articles: list[dict[str, Any]]) -> dict[str, Any] | None:
         if provider == "anthropic":
             reply = _call_anthropic(user_content)
         else:
-            reply = _call_openai_compatible(user_content)
+            reply = _call_openai_compatible(user_content, caller="briefing")
 
         briefing = _parse_json(reply)
         if briefing is None:
@@ -620,7 +622,7 @@ def generate_regional_briefings(articles: list[dict[str, Any]]) -> dict[str, Any
             if provider == "anthropic":
                 reply = _call_anthropic(user_content)
             else:
-                reply = _call_openai_compatible(user_content)
+                reply = _call_openai_compatible(user_content, caller="regional")
 
             briefing = _parse_json(reply)
             if not briefing:
