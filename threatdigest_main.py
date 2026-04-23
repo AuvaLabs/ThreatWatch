@@ -195,6 +195,15 @@ def main():
     except Exception as e:
         logging.warning(f"EPSS enrichment failed: {e}")
 
+    # CVE exploitation narratives (LLM-generated, cached by CVE ID).
+    # Only fires for CVSS>=8.0 or EPSS>=80th percentile; cache makes
+    # subsequent runs free for the same CVE. caller="cve_narrative".
+    try:
+        from modules.cve_narrative import enrich_articles_with_cve_narratives
+        enriched_articles = enrich_articles_with_cve_narratives(enriched_articles)
+    except Exception as e:
+        logging.warning(f"CVE narrative enrichment failed: {e}")
+
     # MITRE ATT&CK technique tagging
     try:
         enriched_articles = tag_articles_with_attack(enriched_articles)
