@@ -219,6 +219,15 @@ def main():
     except Exception as e:
         logging.warning(f"CVE annotation failed: {e}")
 
+    # Deep TTP extraction over full article bodies. Gated on
+    # is_cyber_attack + body length; cache-first so re-runs cost
+    # nothing. caller="ttp_extract".
+    try:
+        from modules.ttp_extractor import enrich_articles_with_ttps
+        enrich_articles_with_ttps(enriched_articles)
+    except Exception as e:
+        logging.warning(f"TTP extraction failed: {e}")
+
     # IOC extraction — pulls IPs, domains, hashes, URLs, emails out of article
     # body text so the dashboard and /api/iocs can surface indicators. Runs
     # before write so values are persisted.
