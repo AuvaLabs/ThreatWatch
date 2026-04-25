@@ -108,7 +108,8 @@ def _response_format_unsupported(resp: requests.Response) -> bool:
 def call_llm(user_content: str, system_prompt: str,
              max_tokens: int = 2000,
              response_format: dict | None = None,
-             caller: str | None = None) -> str:
+             caller: str | None = None,
+             model: str | None = None) -> str:
     """Call Groq/OpenAI-compatible API with smart key failover on 429s.
 
     Args:
@@ -133,7 +134,7 @@ def call_llm(user_content: str, system_prompt: str,
 
     url = f"{LLM_BASE_URL.rstrip('/')}/chat/completions"
     base_payload = {
-        "model": LLM_MODEL,
+        "model": model or LLM_MODEL,
         "max_tokens": max_tokens,
         "temperature": 0.3,
         "messages": [

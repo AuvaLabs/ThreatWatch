@@ -23,6 +23,8 @@ from modules.briefing_generator import (
     _build_digest,
     _MAX_DIGEST_ARTICLES,
 )
+import os
+
 from modules.config import OUTPUT_DIR, LLM_MODEL
 
 logger = logging.getLogger(__name__)
@@ -31,6 +33,17 @@ logger = logging.getLogger(__name__)
 _TOP_STORIES_PATH = OUTPUT_DIR / "top_stories.json"
 _TOP_STORIES_COOLDOWN = 3600  # 1 hour
 _LAST_TOP_STORIES_PATH = OUTPUT_DIR / ".top_stories_last_call"
+# Top stories runs after briefing + regional in the AI enrichment chain,
+# which together burn most of Groq free-tier per-key TPM in seconds. The
+# 70B 5K-token prompt then 429s on every key. Use the lighter 8B model
+# by default — editorial selection doesn't need deep reasoning. Override
+# via TOP_STORIES_MODEL env var.
+_TOP_STORIES_MODEL = os.environ.get("TOP_STORIES_MODEL", "llama-3.1-8b-instant")
+# 8B has an 8K context window — the briefing-default 80-article digest
+# overflows it. 30 articles is enough to pick a top-5-to-8 list and fits
+# comfortably (~2.5K input tokens + 1.5K output reserve). When running
+# on a larger model, the cap is harmless (the 70B sees more if anything).
+_TOP_STORIES_MAX_ARTICLES = int(os.environ.get("TOP_STORIES_MAX_ARTICLES", "30"))
 
 _TOP_STORIES_PROMPT = """You are a cyber threat intelligence editor selecting the most significant incidents for a security team's daily briefing. Your job: cut through the noise and surface what actually matters.
 
@@ -134,9 +147,10 @@ def generate_top_stories(articles: list[dict[str, Any]]) -> list[dict[str, Any]]
         all_filtered = articles
 
     day1, day3, older = _split_by_age(all_filtered)
-    briefing_articles = (day1 + day3)[:_MAX_DIGEST_ARTICLES]  # Last 72h
+    cap = min(_MAX_DIGEST_ARTICLES, _TOP_STORIES_MAX_ARTICLES)
+    briefing_articles = (day1 + day3)[:cap]  # Last 72h
     if len(briefing_articles) < 10:
-        briefing_articles = all_filtered[:_MAX_DIGEST_ARTICLES]
+        briefing_articles = all_filtered[:cap]
 
     digest = _build_digest(briefing_articles)
     # Date-bucket the cache key so a near-static corpus still triggers a
@@ -177,6 +191,7 @@ def generate_top_stories(articles: list[dict[str, Any]]) -> list[dict[str, Any]]
             system_prompt=_TOP_STORIES_PROMPT,
             max_tokens=1500,
             caller="top_stories",
+            model=_TOP_STORIES_MODEL,
         )
         result = _parse_json(reply)
         if not result or "top_stories" not in result:
@@ -198,8 +213,8 @@ def generate_top_stories(articles: list[dict[str, Any]]) -> list[dict[str, Any]]
         story_data = {
             "stories": stories,
             "generated_at": now.isoformat(),
-            "articles_analyzed": min(len(articles), _MAX_DIGEST_ARTICLES),
-            "provider": f"{provider}/{LLM_MODEL}",
+            "articles_analyzed": min(len(articles), cap),
+            "provider": f"{provider}/{_TOP_STORIES_MODEL}",
         }
 
         # Record and cache
