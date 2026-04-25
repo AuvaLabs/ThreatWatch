@@ -15,13 +15,16 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
+import time
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
 from modules.config import OUTPUT_DIR
+from modules.llm_client import reset_circuit
 # Import via briefing_generator so its load order resolves the re-export
 # cycle that otherwise bites when article_summariser is loaded first.
 from modules.briefing_generator import summarize_articles
@@ -29,6 +32,10 @@ from modules.briefing_generator import summarize_articles
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [backfill] %(message)s")
 
 DAILY_PATH = OUTPUT_DIR / "daily_latest.json"
+# Seconds between passes so per-key TPM windows can clear. Each pass is
+# a single LLM call when MAX_SUMMARIES_PER_RUN <= _SUMMARY_BATCH_SIZE (10),
+# so a short pause is enough.
+SLEEP_BETWEEN_PASSES = float(os.environ.get("BACKFILL_SUMMARY_SLEEP", "10"))
 
 
 def _load() -> list[dict]:
@@ -86,14 +93,25 @@ def main() -> int:
         pending = eligible(articles)
         if not pending:
             break
+        # Each pass starts fresh — clear the circuit so a streak of 429s
+        # earlier in the run can't poison subsequent passes.
+        reset_circuit()
         # summarize_articles mutates the dicts we pass. We work over our own
         # loaded copy here, so that mutation is scoped to in-memory dicts;
         # the disk write happens via _save_with_merge which re-reads and
         # merges by hash so we don't clobber concurrent pipeline writes.
         this_pass = summarize_articles(articles)
         if this_pass == 0:
-            logging.info("summariser returned 0 this pass, stopping")
-            break
+            # Pace and retry once before quitting — a transient 429 streak
+            # shouldn't cap the run early.
+            logging.info("pass returned 0; sleeping %.0fs then retrying once",
+                         SLEEP_BETWEEN_PASSES * 3)
+            time.sleep(SLEEP_BETWEEN_PASSES * 3)
+            reset_circuit()
+            this_pass = summarize_articles(articles)
+            if this_pass == 0:
+                logging.info("summariser still returned 0, stopping")
+                break
         # Collect what we just wrote so the merge step on disk can apply it.
         summaries_by_hash: dict[str, dict] = {}
         for a in articles:
@@ -110,8 +128,11 @@ def main() -> int:
         articles = _load()
         total_touched += touched
         passes += 1
+        remaining = len(eligible(articles))
         logging.info("pass %d: %d summaries merged, %d still pending",
-                     passes, touched, len(eligible(articles)))
+                     passes, touched, remaining)
+        if remaining > 0:
+            time.sleep(SLEEP_BETWEEN_PASSES)
 
     logging.info("done: %d summaries merged in %d passes, %d still unsummarised",
                  total_touched, passes, len(eligible(articles)))
