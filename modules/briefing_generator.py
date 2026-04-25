@@ -218,7 +218,8 @@ def _compute_reporting_window(articles: list[dict[str, Any]]) -> str:
 
 def _call_openai_compatible(user_content: str, system_prompt: str = None,
                             max_tokens: int = 2000,
-                            caller: str | None = None) -> str:
+                            caller: str | None = None,
+                            model: str | None = None) -> str:
     """Call Groq/OpenAI-compatible API via shared llm_client.
 
     All briefing callers expect strict JSON back, so we opt into Groq's
@@ -226,6 +227,10 @@ def _call_openai_compatible(user_content: str, system_prompt: str = None,
     — the single choke point for global/regional/top-stories/summary LLM calls.
     The shared client auto-falls back to a plain call if the provider rejects
     the field, so this is safe to ship even if Groq ever drops support.
+
+    The ``model`` kwarg lets a caller opt into a lighter Groq model (e.g.
+    ``llama-3.1-8b-instant``) for tasks where the default 70B is too
+    token-heavy for free-tier TPM. Defaults to the global ``LLM_MODEL``.
     """
     return _call_groq(
         user_content,
@@ -233,6 +238,7 @@ def _call_openai_compatible(user_content: str, system_prompt: str = None,
         max_tokens=max_tokens,
         response_format={"type": "json_object"},
         caller=caller,
+        model=model,
     )
 
 

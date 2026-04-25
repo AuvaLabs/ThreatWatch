@@ -184,7 +184,7 @@ class TestGenerateTopStories:
         with patch.object(ts, "_detect_provider", return_value="openai"), \
              patch.object(ts, "_build_digest", return_value="digest text"), \
              patch.object(ts, "_MAX_DIGEST_ARTICLES", 80), \
-             patch.object(ts, "LLM_MODEL", "test-model"), \
+             patch.object(ts, "_TOP_STORIES_MODEL", "test-model"), \
              patch.object(ts, "get_cached_result", return_value=None), \
              patch.object(ts, "_call_openai_compatible", return_value=llm_response), \
              patch.object(ts, "_parse_json", return_value=json.loads(llm_response)), \
