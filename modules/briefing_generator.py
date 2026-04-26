@@ -44,6 +44,7 @@ THREAT LEVEL:
 RULES:
 - Name SPECIFIC threat actors, CVEs, organizations, malware — never say "ransomware is increasing" without naming which groups and victims
 - Every claim must cite source article numbers [N] in the "sources" array
+- "headline" is the front-of-page TL;DR — 1 sentence, ≤140 chars, leading with the SINGLE most impactful item from what_happened. Name the specific actor/CVE/victim. Active voice. No throat-clearing ("Over the last 24 hours...", "Several incidents..."). Examples of good vs bad: GOOD = "CISA adds Cisco ASA zero-day CVE-2026-1234 to KEV after Volt Typhoon mass exploitation." BAD = "There were several significant cybersecurity events today including..."
 - "what_happened" is the MAIN SECTION — write it as a narrative that covers the most significant incidents, weaving in trending patterns, CVE details, and ATT&CK tactics. Do NOT repeat information across sections.
 - "what_to_do" actions must reference the SPECIFIC threats from what_happened — never generic ("patch your systems", "train employees")
 - KEV-listed CVEs (marked "KEV-listed [date]" in the vuln context) are CONFIRMED exploited in the wild by CISA — when one appears, lead with it and surface the KEV status explicitly (e.g., "CVE-2026-3844 was added to the CISA KEV catalog on 2026-04-25, confirming active in-the-wild exploitation"). Mark the matching what_to_do action as urgent.
@@ -54,6 +55,7 @@ RULES:
 Respond ONLY with valid JSON (no markdown, no code fences). All arrays must use strict JSON — use `[]` for empty arrays, never `[none]`, `[None]`, or `[undefined]`. Use `null` or an empty string for missing string values.
 {
   "threat_level": "CRITICAL|ELEVATED|MODERATE|GUARDED|LOW",
+  "headline": "<1 sentence, ≤140 chars: the single most important development right now. Active voice, named entities, no boilerplate openers.>",
   "assessment_basis": "<1 sentence: WHY this level, citing the key driver>",
   "what_happened": "<4-6 sentence narrative covering the most significant incidents from the last 24 hours. Name actors, victims, CVEs, and attack methods. Weave in trending patterns and vulnerability details rather than listing them separately. Each incident should be distinct — no repetition.>",
   "what_happened_sources": [1, 2, 3],
@@ -87,6 +89,25 @@ def _detect_provider() -> str | None:
 
 
 _MAX_DIGEST_ARTICLES = 80  # articles sent to the LLM
+_HEADLINE_SOFT_CAP = 160   # belt-and-braces trim if model overshoots the prompt cap
+
+
+def _normalise_headline(raw: str | None) -> str:
+    """Trim a model-supplied headline to a clause boundary near the soft cap.
+
+    The prompt asks for ≤140 chars, but models occasionally overshoot. We
+    accept up to 160 silently; beyond that, prefer to cut at ", "/"; "/". "
+    so the result still reads as a complete thought, falling back to a
+    word-boundary trim with an ellipsis.
+    """
+    text = (raw or "").strip()
+    if len(text) <= _HEADLINE_SOFT_CAP:
+        return text
+    cut = text[:_HEADLINE_SOFT_CAP]
+    clause = max(cut.rfind(", "), cut.rfind("; "), cut.rfind(". "))
+    if clause >= 100:
+        return cut[:clause] + "…"
+    return cut.rstrip() + "…"
 
 
 def _build_digest(articles: list[dict[str, Any]]) -> str:
@@ -474,6 +495,9 @@ def generate_briefing(articles: list[dict[str, Any]]) -> dict[str, Any] | None:
         briefing.setdefault("what_to_do", [])
         briefing.setdefault("week_in_review", "")
         briefing.setdefault("outlook", "")
+        # Surface as TL;DR hero on the dashboard; blank string lets the
+        # frontend's regex distillation of what_happened take over.
+        briefing["headline"] = _normalise_headline(briefing.get("headline"))
 
         # Build source article map so frontend can resolve [N] → link/title
         source_map = []
@@ -673,6 +697,7 @@ def generate_regional_briefings(articles: list[dict[str, Any]]) -> dict[str, Any
 
             briefing.setdefault("what_to_do", [])
             briefing.setdefault("outlook", "")
+            briefing["headline"] = _normalise_headline(briefing.get("headline"))
 
             # Source article map
             source_map = []
