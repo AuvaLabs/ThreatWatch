@@ -25,20 +25,19 @@ os.chdir(BASE_DIR)
 sys.path.insert(0, str(BASE_DIR))
 
 from modules.logger_utils import setup_logger  # noqa: E402
-
-_BRIEFING_PATH = BASE_DIR / "data" / "output" / "briefing.json"
+from modules.briefing_generator import BRIEFING_PATH  # noqa: E402
 
 
 def main() -> int:
     setup_logger()
     log = logging.getLogger("telegram-poster")
 
-    if not _BRIEFING_PATH.exists():
-        log.error("Briefing file not found: %s", _BRIEFING_PATH)
+    if not BRIEFING_PATH.exists():
+        log.error("Briefing file not found: %s", BRIEFING_PATH)
         return 1
 
     try:
-        briefing = json.loads(_BRIEFING_PATH.read_text(encoding="utf-8"))
+        briefing = json.loads(BRIEFING_PATH.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as e:
         log.error("Could not load briefing: %s", e)
         return 1

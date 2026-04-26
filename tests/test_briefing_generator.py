@@ -218,9 +218,11 @@ class TestReadPriorLevel:
 class TestStampPreviousLevel:
     def test_first_run_stamps_none(self, tmp_path):
         briefing = {"threat_level": "ELEVATED"}
-        _stamp_previous_level(briefing, tmp_path / "absent.json")
-        assert briefing["previous_threat_level"] is None
-        assert briefing["previous_generated_at"] is None
+        stamped = _stamp_previous_level(briefing, tmp_path / "absent.json")
+        assert stamped["previous_threat_level"] is None
+        assert stamped["previous_generated_at"] is None
+        # Non-mutating: original briefing must be unchanged.
+        assert "previous_threat_level" not in briefing
 
     def test_subsequent_run_stamps_prior_level(self, tmp_path):
         path = tmp_path / "briefing.json"
@@ -229,9 +231,11 @@ class TestStampPreviousLevel:
             "generated_at": "2026-04-25T08:00:00+00:00",
         }))
         briefing = {"threat_level": "ELEVATED"}
-        _stamp_previous_level(briefing, path)
-        assert briefing["previous_threat_level"] == "MODERATE"
-        assert briefing["previous_generated_at"] == "2026-04-25T08:00:00+00:00"
+        stamped = _stamp_previous_level(briefing, path)
+        assert stamped["previous_threat_level"] == "MODERATE"
+        assert stamped["previous_generated_at"] == "2026-04-25T08:00:00+00:00"
+        # Non-mutating: the returned dict carries the stamps, original does not.
+        assert "previous_threat_level" not in briefing
 
 
 # ---------------------------------------------------------------------------
