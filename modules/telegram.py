@@ -80,21 +80,23 @@ def _get_session() -> requests.Session:
     return _session
 
 
-def _load_state() -> dict:
+def _load_json_state(path: Path) -> dict[str, str]:
+    """Read a Telegram dedup state file, returning {} on any failure."""
     try:
-        if _STATE_PATH.exists():
-            return json.loads(_STATE_PATH.read_text(encoding="utf-8"))
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         pass
     return {}
 
 
-def _save_state(state: dict) -> None:
+def _save_json_state(path: Path, state: dict[str, str]) -> None:
+    """Persist a Telegram dedup state file; warns and continues on I/O error."""
     try:
-        _STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _STATE_PATH.write_text(json.dumps(state), encoding="utf-8")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(state), encoding="utf-8")
     except OSError as e:
-        logger.warning("Could not persist telegram alert state: %s", e)
+        logger.warning("Could not persist telegram state (%s): %s", path.name, e)
 
 
 def _should_alert(level: str, state: dict) -> bool:
@@ -210,7 +212,7 @@ def dispatch_telegram_briefing(briefing: dict | None) -> bool:
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID or not briefing:
         return False
     level = (briefing.get("threat_level") or "").upper()
-    state = _load_state()
+    state = _load_json_state(_STATE_PATH)
     if not _should_alert(level, state):
         return False
 
@@ -218,29 +220,12 @@ def dispatch_telegram_briefing(briefing: dict | None) -> bool:
     if not _send(text):
         return False
 
-    _save_state({
+    _save_json_state(_STATE_PATH, {
         "level": level,
         "alerted_at": datetime.now(timezone.utc).isoformat(),
     })
     logger.info("Telegram briefing dispatched: threat_level=%s", level)
     return True
-
-
-def _load_kev_state() -> dict:
-    try:
-        if _KEV_STATE_PATH.exists():
-            return json.loads(_KEV_STATE_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        pass
-    return {}
-
-
-def _save_kev_state(state: dict) -> None:
-    try:
-        _KEV_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _KEV_STATE_PATH.write_text(json.dumps(state), encoding="utf-8")
-    except OSError as e:
-        logger.warning("Could not persist telegram KEV alert state: %s", e)
 
 
 def _format_kev_alert(cve_id: str, kev_entry: dict, articles: list[dict]) -> str:
@@ -299,7 +284,7 @@ def dispatch_telegram_kev_alerts(articles: list[dict]) -> int:
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID or not articles:
         return 0
 
-    state = _load_kev_state()
+    state = _load_json_state(_KEV_STATE_PATH)
     sent = 0
     # Group articles by CVE so a single CVE referenced by 5 articles is
     # one alert, not five. Picks the earliest date_added entry per CVE
@@ -341,7 +326,7 @@ def dispatch_telegram_kev_alerts(articles: list[dict]) -> int:
         sent += 1
 
     if sent:
-        _save_kev_state(state)
+        _save_json_state(_KEV_STATE_PATH, state)
         logger.info("Telegram KEV alerts dispatched: %d new CVE(s)", sent)
     return sent
 

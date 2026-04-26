@@ -68,12 +68,14 @@ def run_ai_enrichment(
 
     # Independent Telegram channel post — same level/cooldown logic but its own
     # state file so an org can drive Slack and Telegram in parallel without
-    # one path muting the other.
+    # one path muting the other. Broad catch is intentional (alert failures
+    # must not abort enrichment); exc_info preserves the traceback so a
+    # programmer-error (TypeError/AttributeError) is still diagnosable in logs.
     try:
         from modules.telegram import dispatch_telegram_briefing
         dispatch_telegram_briefing(briefing)
-    except Exception as e:
-        logger.warning(f"Telegram briefing dispatch failed: {e}")
+    except Exception:
+        logger.warning("Telegram briefing dispatch failed", exc_info=True)
 
     # Tier 1b: Regional digests — NA, EMEA, APAC
     try:

@@ -428,7 +428,9 @@ class TestSaveLoadBriefing:
         with patch.object(bg, "BRIEFING_PATH", path):
             bg._save_briefing(data)
             result = bg.load_briefing()
-        assert result == data
+        # _save_briefing stamps previous_* fields read from any prior on-disk
+        # briefing; first run has no prior so both stamp as None.
+        assert result == {**data, "previous_threat_level": None, "previous_generated_at": None}
 
     def test_load_returns_none_when_missing(self, tmp_path):
         with patch.object(bg, "BRIEFING_PATH", tmp_path / "missing.json"):
@@ -458,7 +460,9 @@ class TestRegionalBriefingPersistence:
         briefing = {"region": "na", "what_happened": "Test", "generated_at": "2026-01-01"}
         bg._save_regional_briefing("na", briefing)
         loaded = bg.load_regional_briefing("na")
-        assert loaded == briefing
+        # _save_regional_briefing stamps previous_* fields read from any prior
+        # on-disk regional briefing; first run has no prior so both stamp as None.
+        assert loaded == {**briefing, "previous_threat_level": None, "previous_generated_at": None}
 
     def test_load_returns_none_when_missing(self, tmp_path, monkeypatch):
         monkeypatch.setattr(bg, "OUTPUT_DIR", tmp_path / "empty")

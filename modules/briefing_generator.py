@@ -560,20 +560,27 @@ def _read_prior_level(path: Path) -> tuple[str | None, str | None]:
     return (level, generated_at)
 
 
-def _stamp_previous_level(briefing: dict[str, Any], path: Path) -> None:
-    """Mutate briefing in-place to record the prior on-disk level/timestamp."""
+def _stamp_previous_level(briefing: dict[str, Any], path: Path) -> dict[str, Any]:
+    """Return a new briefing dict carrying the prior on-disk level/timestamp.
+
+    Non-mutating: callers receive a fresh dict so the original (which may
+    still be held by the cache layer) is not silently modified.
+    """
     prev_level, prev_at = _read_prior_level(path)
-    briefing["previous_threat_level"] = prev_level
-    briefing["previous_generated_at"] = prev_at
+    return {
+        **briefing,
+        "previous_threat_level": prev_level,
+        "previous_generated_at": prev_at,
+    }
 
 
 def _save_briefing(briefing: dict[str, Any]) -> None:
     """Save briefing to disk for the server to serve."""
-    _stamp_previous_level(briefing, BRIEFING_PATH)
+    stamped = _stamp_previous_level(briefing, BRIEFING_PATH)
     BRIEFING_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(BRIEFING_PATH, "w", encoding="utf-8") as f:
-        json.dump(briefing, f, ensure_ascii=False)
-    logger.info(f"Briefing saved to {BRIEFING_PATH}")
+        json.dump(stamped, f, ensure_ascii=False)
+    logger.info("Briefing saved to %s", BRIEFING_PATH)
 
 
 def load_briefing() -> dict[str, Any] | None:
@@ -772,10 +779,10 @@ def generate_regional_briefings(articles: list[dict[str, Any]]) -> dict[str, Any
 
 def _save_regional_briefing(region_key: str, briefing: dict) -> None:
     path = _regional_briefing_path(region_key)
-    _stamp_previous_level(briefing, path)
+    stamped = _stamp_previous_level(briefing, path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(briefing, f, ensure_ascii=False)
+        json.dump(stamped, f, ensure_ascii=False)
 
 
 def load_regional_briefing(region_key: str) -> dict[str, Any] | None:
