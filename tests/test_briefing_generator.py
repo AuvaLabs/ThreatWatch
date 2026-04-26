@@ -10,9 +10,11 @@ from modules.briefing_generator import (
     _build_digest,
     _parse_json,
     _detect_provider,
+    _normalise_headline,
     generate_briefing,
     load_briefing,
     _MAX_DIGEST_ARTICLES,
+    _HEADLINE_SOFT_CAP,
     BRIEFING_PATH,
 )
 
@@ -144,6 +146,44 @@ class TestDetectProvider:
              patch("modules.briefing_generator.LLM_API_KEY", "sk-test"), \
              patch("modules.briefing_generator.LLM_BASE_URL", "https://api.openai.com/v1"):
             assert _detect_provider() == "openai"
+
+
+# ---------------------------------------------------------------------------
+# _normalise_headline
+# ---------------------------------------------------------------------------
+class TestNormaliseHeadline:
+    def test_none_or_empty_returns_empty_string(self):
+        assert _normalise_headline(None) == ""
+        assert _normalise_headline("") == ""
+        assert _normalise_headline("   ") == ""
+
+    def test_short_headline_passes_through(self):
+        text = "CISA adds Cisco ASA zero-day to KEV after Volt Typhoon mass exploitation."
+        assert _normalise_headline(text) == text
+
+    def test_strips_surrounding_whitespace(self):
+        assert _normalise_headline("  Hello world.  ") == "Hello world."
+
+    def test_under_soft_cap_untouched(self):
+        text = "x" * _HEADLINE_SOFT_CAP
+        assert _normalise_headline(text) == text
+
+    def test_over_soft_cap_trims_at_clause_boundary(self):
+        # 200 chars with a clear ", " boundary near the cap.
+        prefix = "A" * 120
+        text = f"{prefix}, then a tail that pushes us well past the cap and should be dropped entirely."
+        result = _normalise_headline(text)
+        assert result.endswith("…")
+        assert len(result) <= _HEADLINE_SOFT_CAP + 1  # +1 for the ellipsis
+        assert "," not in result.rstrip("…")  # clause boundary trimmed cleanly
+
+    def test_over_cap_no_clause_falls_back_to_word_boundary(self):
+        # No ", " or "; " or ". " inside the soft cap window — must word-wrap.
+        text = ("supercalifragilistic " * 20).strip()  # ~420 chars, only spaces
+        result = _normalise_headline(text)
+        assert result.endswith("…")
+        assert " " in result  # ended on a word boundary, not mid-word
+        assert len(result) <= _HEADLINE_SOFT_CAP + 1
 
 
 # ---------------------------------------------------------------------------
