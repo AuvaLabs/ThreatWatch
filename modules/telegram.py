@@ -18,8 +18,10 @@ on the same briefing so an org can drive Slack and Telegram simultaneously.
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 from html import escape as _html_escape
+from pathlib import Path
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -58,6 +60,12 @@ _KEV_STATE_PATH = STATE_DIR / "telegram_kev_alerts.json"
 # pipeline reprocessing) cannot blast 50 messages in 30 seconds. The
 # remaining alerts are silently dropped and will fire on subsequent runs.
 _KEV_MAX_ALERTS_PER_BATCH = 5
+
+# Format guard for CVE IDs that originate in upstream KEV data and end up
+# embedded in NVD URLs / Telegram message bodies. CISA's feed should always
+# match this, but a tampered/malformed entry would otherwise produce a
+# malformed URL — drop the alert rather than emit garbage.
+_CVE_ID_RE = re.compile(r"^CVE-\d{4}-\d{4,}$", re.IGNORECASE)
 
 _session: requests.Session | None = None
 
@@ -185,7 +193,10 @@ def _send(text: str) -> bool:
         resp.raise_for_status()
         return True
     except requests.RequestException as e:
-        logger.warning("Telegram delivery failed: %s", e)
+        # `requests.RequestException` embeds the request URL — which contains
+        # the bot token — in its string repr. Redact before emitting to logs.
+        msg = str(e).replace(TELEGRAM_BOT_TOKEN, "***") if TELEGRAM_BOT_TOKEN else str(e)
+        logger.warning("Telegram delivery failed: %s", msg)
         return False
 
 
@@ -298,8 +309,11 @@ def dispatch_telegram_kev_alerts(articles: list[dict]) -> int:
         if not art.get("kev_listed"):
             continue
         for entry in art.get("kev_entries") or []:
-            cve = entry.get("cve_id") or ""
+            cve = (entry.get("cve_id") or "").upper()
             if not cve or cve in state:
+                continue
+            if not _CVE_ID_RE.match(cve):
+                logger.warning("Telegram KEV alert: skipping malformed CVE ID %r", cve)
                 continue
             slot = by_cve.setdefault(cve, {"entry": entry, "articles": []})
             slot["articles"].append(art)
