@@ -1032,6 +1032,54 @@ html, body {
 }
 @keyframes new-flash { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
 
+/* Cross-session NEW badge: stays visible until the user dismisses the
+   since-last-visit pill. Different colour from the in-tick green flash so
+   the two signals (new in last fetch vs new since you came back) read
+   distinctly without adding a second badge slot. */
+.card-new-badge.persistent {
+  background: var(--accent);
+  animation: none;
+  opacity: 1;
+}
+
+/* "X new since HH:MM" pill anchored to the top of the threat feed.
+   Styled in the same accent-strip family as #watch-filter-banner so the
+   left panel stays visually coherent. */
+.new-visit-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(45,140,255,0.10);
+  border-bottom: 1px solid rgba(45,140,255,0.22);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+}
+.new-visit-pill .nv-text { font-weight: 700; }
+.new-visit-pill .nv-since {
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-left: 4px;
+}
+.new-visit-pill .nv-clear {
+  background: none;
+  border: 1px solid rgba(45,140,255,0.35);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.6px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-transform: uppercase;
+}
+.new-visit-pill .nv-clear:hover {
+  background: rgba(45,140,255,0.15);
+}
+
 /* ============================================================= */
 /* MAIN CONTENT AREA                                              */
 /* ============================================================= */
@@ -2438,6 +2486,10 @@ body.self-hosted-mode .watch-section-desc .sh-only { display: inline; }
       <div class="feed-meta">
         <span id="last-refresh">--</span>
       </div>
+      <div id="new-visit-pill" class="new-visit-pill" style="display:none">
+        <span><span class="nv-text"></span><span class="nv-since"></span></span>
+        <button class="nv-clear" data-click-action="clearNewSinceVisit">Mark as read</button>
+      </div>
     </div>
     <div id="threat-feed">
       <div class="skeleton-card"><div class="skeleton skel-badges"></div><div class="skeleton skel-title"></div><div class="skeleton skel-title2"></div><div class="skeleton skel-desc"></div><div class="skeleton skel-desc2"></div><div class="skeleton skel-footer"></div></div>
@@ -2879,6 +2931,10 @@ const state = {
   aiBriefing: null,       // AI briefing JSON from server
   topStories: null,       // AI-curated top stories from server
   trends: null,           // Trending threats / spike report from /api/trends
+  lastSeenAt: null,       // Persisted "last visit" watermark (ISO) — drives the
+                          // since-last-visit NEW badges and the dismissible pill.
+                          // Captured ONCE per page load so the in-tab auto-refresh
+                          // does not move the marker forward on the user.
   clusters: null,         // Incident clusters from server
   actorProfiles: null,    // Threat actor profiles from server
   briefingMode: 'ai', // 'normal' or 'ai' — default to AI mode
@@ -4120,7 +4176,11 @@ function filterFeedSearch(val) {
 function buildCardHTML(item) {
   const sevClass = 'sev-' + item.severity.toLowerCase();
   const activeClass = state.selectedItem && state.selectedItem._id === item._id ? ' active' : '';
-  const newBadge = item.isNew ? '<span class="card-new-badge">NEW</span>' : '';
+  const newBadge = item.isNewSinceVisit
+    ? '<span class="card-new-badge persistent" title="New since your last visit">NEW</span>'
+    : item.isNewInTick
+    ? '<span class="card-new-badge">NEW</span>'
+    : '';
   const icon = item.icon || '';
 
   const countries = extractCountries(item.title, item.description);
@@ -5058,14 +5118,67 @@ function hideLoader() {
   setTimeout(() => loader.remove(), 450);
 }
 
+/* Read previous visit timestamp from localStorage and immediately stamp the
+   current visit. Capture-then-replace ensures auto-refresh ticks within this
+   page load do NOT advance the watermark — only a true new page load does.
+   First-ever visit yields lastSeenAt = null, which suppresses the pill. */
+const _LAST_SEEN_KEY = 'tw_last_seen_at';
+function loadLastSeen() {
+  try {
+    const prev = localStorage.getItem(_LAST_SEEN_KEY);
+    state.lastSeenAt = prev || null;
+    localStorage.setItem(_LAST_SEEN_KEY, new Date().toISOString());
+  } catch {
+    state.lastSeenAt = null;  // localStorage may be blocked in private mode
+  }
+}
+
+/* Count news items newer than the watermark, then update the pill text +
+   visibility. Hidden when watermark is null (first visit) or count is zero. */
+function renderNewSinceVisitPill() {
+  const pill = document.getElementById('new-visit-pill');
+  if (!pill) return;
+  if (!state.lastSeenAt) { pill.style.display = 'none'; return; }
+  const cutoff = new Date(state.lastSeenAt).getTime();
+  const count = state.newsItems.filter(i =>
+    new Date(i.pubDate).getTime() > cutoff
+  ).length;
+  if (count === 0) { pill.style.display = 'none'; return; }
+
+  const since = new Date(state.lastSeenAt).toUTCString().slice(17, 22);  // "HH:MM"
+  pill.querySelector('.nv-text').textContent = `${count} NEW`;
+  pill.querySelector('.nv-since').textContent = ` · since ${since} UTC`;
+  pill.style.display = '';
+}
+
+/* Mark-as-read: bump watermark to now, clear per-item flags, re-render
+   so the persistent NEW badges and the pill all disappear at once. */
+function clearNewSinceVisit() {
+  const now = new Date().toISOString();
+  try { localStorage.setItem(_LAST_SEEN_KEY, now); } catch {}
+  state.lastSeenAt = now;
+  state.newsItems.forEach(i => { i.isNewSinceVisit = false; i.isNew = i.isNewInTick; });
+  renderNewSinceVisitPill();
+  renderFeedCards();
+}
+
 function applyData(items) {
   // Sort by date descending
   items.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
 
-  // Mark new items
+  // Two flavours of "new":
+  //  - isNewInTick: arrived in this 2-min refresh fetch (in-session delta).
+  //    Drives the existing 3s green flash. First fetch after page load
+  //    has empty prevTitles so nothing flashes — by design.
+  //  - isNewSinceVisit: published after the user's previous visit watermark
+  //    (state.lastSeenAt, captured ONCE at page load from localStorage).
+  //    Drives the persistent accent NEW badge + the dismissible counter pill.
   const newTitles = new Set(items.map(i => i.title));
+  const watermark = state.lastSeenAt ? new Date(state.lastSeenAt).getTime() : null;
   items.forEach(item => {
-    item.isNew = state.prevTitles.size > 0 && !state.prevTitles.has(item.title);
+    item.isNewInTick = state.prevTitles.size > 0 && !state.prevTitles.has(item.title);
+    item.isNewSinceVisit = watermark !== null && new Date(item.pubDate).getTime() > watermark;
+    item.isNew = item.isNewInTick || item.isNewSinceVisit;  // legacy callers read .isNew
   });
   state.prevTitles = newTitles;
 
@@ -5079,6 +5192,7 @@ function applyData(items) {
   state.feedStatus.threatdigest = items.length > 0;
 
   renderFeedCards();
+  renderNewSinceVisitPill();
   updateOverviewStats();
   updateRegionCounts();
   buildThreatCategoryChart([], state.newsItems);
@@ -5556,6 +5670,12 @@ function selectItemById(id) {
 /* INITIALIZATION                                                 */
 /* ============================================================= */
 function init() {
+  // Capture the prior visit watermark FIRST — must run before any applyData
+  // so isNewSinceVisit is computed against the right cutoff. Re-stamping
+  // localStorage to "now" happens inside loadLastSeen as well, so closing
+  // and reopening the tab later picks up this visit as the new baseline.
+  loadLastSeen();
+
   // Phase 1: Read SSR-embedded data (instant — zero network requests)
   const ssr = loadSSRData();
   if (ssr) {
