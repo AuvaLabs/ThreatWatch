@@ -909,6 +909,72 @@ html, body {
   border-color: rgba(192,57,43,0.35);
 }
 
+/* Trending threats panel: surfaces what trend_detector.py finds — both
+   point-in-time spikes (today >= 2x rolling avg) and the cumulative
+   top-mentioned keywords / categories over the last 7 days. The panel
+   degrades gracefully: if no spikes today, it still shows the 7-day
+   leaderboard so the section is never empty. */
+.trending-subtitle {
+  margin-left: 8px; font-size: 9px; color: var(--text-muted);
+  letter-spacing: 0.5px; text-transform: uppercase;
+  font-family: var(--font-mono); font-weight: 500;
+}
+.trending-empty {
+  font-size: 11px; color: var(--text-muted); padding: 12px 4px;
+  font-style: italic;
+}
+.trending-block { margin: 10px 0 14px; }
+.trending-block-label {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.8px;
+  text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;
+  display: flex; align-items: center; gap: 6px;
+}
+.trending-block-label.spiking { color: var(--danger); font-weight: 700; }
+.trending-block-label .pulse {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--danger);
+  box-shadow: 0 0 8px var(--danger); animation: trending-pulse 1.6s ease-in-out infinite;
+}
+@keyframes trending-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.85); }
+  50%      { opacity: 1;   transform: scale(1.15); }
+}
+.trending-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.trending-pill {
+  font-family: var(--font-mono); font-size: 10px;
+  border-radius: var(--radius-sm);
+  padding: 3px 8px; white-space: nowrap;
+  color: var(--text-primary);
+  background: rgba(125, 125, 125, 0.08);
+  border: 1px solid rgba(125, 125, 125, 0.22);
+  display: inline-flex; align-items: center; gap: 5px;
+  cursor: help;
+}
+.trending-pill .tp-name { font-weight: 600; letter-spacing: 0.2px; }
+.trending-pill .tp-count {
+  color: var(--text-muted); font-size: 9px;
+  background: rgba(125, 125, 125, 0.18);
+  padding: 1px 5px; border-radius: 4px;
+}
+.trending-pill.spike {
+  color: var(--danger);
+  background: rgba(239,68,68,0.10);
+  border-color: rgba(239,68,68,0.32);
+}
+.trending-pill.spike .tp-count {
+  color: var(--danger);
+  background: rgba(239,68,68,0.18);
+}
+.trending-pill.spike.new {
+  color: var(--accent);
+  background: rgba(45,140,255,0.10);
+  border-color: rgba(45,140,255,0.32);
+}
+.trending-pill.spike.new .tp-count {
+  color: var(--accent);
+  background: rgba(45,140,255,0.18);
+}
+.trending-pill.cat { opacity: 0.85; }
+
 /* Full IOC block inside detail panel — grouped by type, each row lists every
    indicator of that type with monospace so hashes and IPs line up cleanly. */
 .detail-iocs { margin: 12px 0; font-family: var(--font-mono); font-size: 11px; }
@@ -2452,6 +2518,13 @@ body.self-hosted-mode .watch-section-desc .sh-only { display: inline; }
         <div class="center-section-title"><span class="section-icon">&#x1F4A1;</span> Headlines <span class="briefing-ai-notice" style="font-size:9px;vertical-align:middle">AI CURATED</span></div>
         <div id="top-stories-content"></div>
       </div>
+      <div class="center-section" id="section-trending-threats">
+        <div class="center-section-title">
+          <span class="section-icon">&#x1F525;</span> Trending Threats
+          <span class="trending-subtitle" id="trending-subtitle"></span>
+        </div>
+        <div id="trending-threats-content"></div>
+      </div>
       <div class="center-section" id="section-actors">
         <div class="center-section-title"><span class="section-icon">&#x1F3AD;</span> Active Threat Actors &amp; Malware</div>
         <div id="actor-spotlight-content"></div>
@@ -2805,6 +2878,7 @@ const state = {
   pipelineStats: null,
   aiBriefing: null,       // AI briefing JSON from server
   topStories: null,       // AI-curated top stories from server
+  trends: null,           // Trending threats / spike report from /api/trends
   clusters: null,         // Incident clusters from server
   actorProfiles: null,    // Threat actor profiles from server
   briefingMode: 'ai', // 'normal' or 'ai' — default to AI mode
@@ -3063,6 +3137,9 @@ function analyzeIntelligence() {
 
   // --- Section 2: Headlines (AI-curated) ---
   renderTopStories();
+
+  // --- Section 2b: Trending Threats (spike + 7d leaderboard) ---
+  renderTrending();
 
   // --- Section 3: Threat Actor Spotlight ---
   renderActorSpotlight(items, allText);
@@ -3551,6 +3628,98 @@ function renderTopStories() {
   const modelLabel = data.provider ? data.provider.split('/').pop() : '';
   html += `<div class="briefing-timestamp">AI-CURATED ${genAt} UTC | ${data.articles_analyzed || '?'} ARTICLES REVIEWED | ${modelLabel}</div>`;
 
+  container.innerHTML = html;
+}
+
+/* Render trending threats panel from /api/trends report.
+   Shows spikes (today >= 2x baseline) prominently when present, then a
+   7-day top-mentioned leaderboard. Gracefully no-ops on missing data. */
+function renderTrending() {
+  const container = document.getElementById('trending-threats-content');
+  const subtitle = document.getElementById('trending-subtitle');
+  if (!container) return;
+  const t = state.trends;
+  if (!t || t.status !== 'ok') {
+    container.innerHTML = '<div class="trending-empty">Trend data warming up — needs at least a few days of pipeline runs.</div>';
+    if (subtitle) subtitle.textContent = '';
+    return;
+  }
+
+  if (subtitle) {
+    const days = (t.date_range && t.date_range.days) || 0;
+    subtitle.textContent = `Last 7d · ${days}-day baseline`;
+  }
+
+  let html = '';
+  const spikes = Array.isArray(t.spikes) ? t.spikes : [];
+  const kw7d = t.top_keywords_7d || {};
+  const cat7d = t.categories_7d || {};
+
+  if (spikes.length > 0) {
+    const spikeHtml = spikes.slice(0, 12).map(s => {
+      const isNew = s.type === 'new_emergence';
+      const cls = isNew ? 'trending-pill spike new' : 'trending-pill spike';
+      const ratio = isNew
+        ? 'first appearance'
+        : `${s.spike_ratio}× vs ~${s.avg_count}/day baseline`;
+      const tip = `${s.keyword}: ${s.today_count} mentions today (${ratio})`;
+      const badge = isNew ? 'NEW' : `${s.spike_ratio}×`;
+      return `<span class="${cls}" title="${escapeHTML(tip)}">
+        <span class="tp-name">${escapeHTML(s.keyword)}</span>
+        <span class="tp-count">${badge}</span>
+      </span>`;
+    }).join('');
+    html += `<div class="trending-block">
+      <div class="trending-block-label spiking"><span class="pulse"></span>Spiking now</div>
+      <div class="trending-pills">${spikeHtml}</div>
+    </div>`;
+  }
+
+  // Suppress already-spiking entries from the leaderboard so the surface doesn't double-count.
+  const spikeNames = new Set(spikes.map(s => s.keyword));
+  const kwEntries = Object.entries(kw7d).filter(([k]) => !spikeNames.has(k)).slice(0, 12);
+  if (kwEntries.length > 0) {
+    const kwHtml = kwEntries.map(([name, count]) => {
+      const tip = `${name}: ${count} article mentions in the last 7 days`;
+      return `<span class="trending-pill" title="${escapeHTML(tip)}">
+        <span class="tp-name">${escapeHTML(name)}</span>
+        <span class="tp-count">${count}</span>
+      </span>`;
+    }).join('');
+    html += `<div class="trending-block">
+      <div class="trending-block-label">Top mentioned · last 7 days</div>
+      <div class="trending-pills">${kwHtml}</div>
+    </div>`;
+  }
+
+  // Cyber-only category mix: skip 'General Cyber Threat' which is the bucket for
+  // everything that didn't classify into a sharper category — it's not insight.
+  const catEntries = Object.entries(cat7d)
+    .filter(([k]) => k && k !== 'General Cyber Threat')
+    .slice(0, 8);
+  if (catEntries.length > 0) {
+    const catHtml = catEntries.map(([name, count]) => {
+      const tip = `${name}: ${count} articles classified in the last 7 days`;
+      return `<span class="trending-pill cat" title="${escapeHTML(tip)}">
+        <span class="tp-name">${escapeHTML(name)}</span>
+        <span class="tp-count">${count}</span>
+      </span>`;
+    }).join('');
+    html += `<div class="trending-block">
+      <div class="trending-block-label">Category mix · last 7 days</div>
+      <div class="trending-pills">${catHtml}</div>
+    </div>`;
+  }
+
+  if (!html) {
+    container.innerHTML = '<div class="trending-empty">No trending signals in the current window.</div>';
+    return;
+  }
+
+  const genAt = t.generated_at ? new Date(t.generated_at).toUTCString().slice(0, 25) : '';
+  if (genAt) {
+    html += `<div class="briefing-timestamp">TRENDS UPDATED ${genAt} UTC</div>`;
+  }
   container.innerHTML = html;
 }
 
@@ -4987,6 +5156,16 @@ async function refreshData() {
       updateThreatLevel();
     }
   } catch {}
+  // Refresh trending threats — cheap JSON, no LLM cost. Re-render only if
+  // the report has actually changed (compare generated_at) to avoid flicker.
+  try {
+    const t = await fetchJSON('/api/trends');
+    if (t && t.status === 'ok') {
+      const prevGen = state.trends && state.trends.generated_at;
+      state.trends = t;
+      if (t.generated_at !== prevGen) renderTrending();
+    }
+  } catch {}
 }
 
 /* ============================================================= */
@@ -5384,6 +5563,7 @@ function init() {
     state.pipelineStats = ssr.stats || null;
     state.aiBriefing = ssr.briefing || null;
     state.topStories = ssr.top_stories || null;
+    state.trends = ssr.trends || null;
     state.clusters = ssr.clusters || null;
     state.actorProfiles = ssr.actor_profiles || null;
     state.regionalBriefings = ssr.regional_briefings || {};
