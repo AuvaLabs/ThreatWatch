@@ -226,6 +226,21 @@ def load_top_stories():
         return None
 
 
+def load_trends():
+    """Load trending-threats report (spikes + top keywords/categories).
+
+    Same flat-file pattern as load_top_stories; trend_detector.py writes
+    data/state/trends.json each pipeline run, but for the SSR payload we
+    want the aggregated *report* shape (spikes + 7d/30d top lists), so
+    we call get_trends_report() rather than reading the raw file.
+    """
+    try:
+        from modules.trend_detector import get_trends_report
+        return get_trends_report()
+    except Exception:
+        return None
+
+
 def load_clusters():
     """Load incident clusters."""
     path = BASE_DIR / "data" / "output" / "clusters.json"
@@ -678,6 +693,7 @@ def build_ssr_data():
         top_stories = load_top_stories()
         clusters = load_clusters()
         actor_profiles = load_actor_profiles()
+        trends = load_trends()
 
         # Regional briefings
         regional_briefings = {}
@@ -708,6 +724,7 @@ def build_ssr_data():
             "top_stories": top_stories,
             "clusters": ssr_clusters,
             "actor_profiles": actor_profiles,
+            "trends": trends,
             "regional_briefings": regional_briefings if regional_briefings else None,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
