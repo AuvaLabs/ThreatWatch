@@ -30,6 +30,8 @@ from modules.ai_cache import get_cached_result, cache_result
 from modules.llm_client import call_llm as _call_groq
 
 BRIEFING_PATH = OUTPUT_DIR / "briefing.json"
+
+_VALID_THREAT_LEVELS = frozenset({"CRITICAL", "ELEVATED", "MODERATE", "GUARDED", "LOW"})
 _LAST_API_CALL_PATH = OUTPUT_DIR / ".briefing_last_call"
 _BRIEFING_COOLDOWN_SECONDS = 3600  # 1 hour minimum between API calls
 
@@ -486,9 +488,8 @@ def generate_briefing(articles: list[dict[str, Any]]) -> dict[str, Any] | None:
             return None
 
         # Normalise threat_level
-        valid_levels = {"CRITICAL", "ELEVATED", "MODERATE", "GUARDED", "LOW"}
         tl = (briefing.get("threat_level") or "").upper()
-        if tl not in valid_levels:
+        if tl not in _VALID_THREAT_LEVELS:
             briefing["threat_level"] = "MODERATE"
 
         # Ensure optional sections have defaults
@@ -545,11 +546,18 @@ def _read_prior_level(path: Path) -> tuple[str | None, str | None]:
     if not path.exists():
         return (None, None)
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return (data.get("threat_level"), data.get("generated_at"))
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return (None, None)
+    # Validate before returning: a tampered or hand-edited briefing.json
+    # could otherwise feed garbage into the dashboard escalation banner.
+    level = data.get("threat_level")
+    if level not in _VALID_THREAT_LEVELS:
+        level = None
+    generated_at = data.get("generated_at")
+    if not isinstance(generated_at, str):
+        generated_at = None
+    return (level, generated_at)
 
 
 def _stamp_previous_level(briefing: dict[str, Any], path: Path) -> None:
@@ -716,9 +724,8 @@ def generate_regional_briefings(articles: list[dict[str, Any]]) -> dict[str, Any
             if "what_happened" not in briefing:
                 continue
 
-            valid_levels = {"CRITICAL", "ELEVATED", "MODERATE", "GUARDED", "LOW"}
             tl = (briefing.get("threat_level") or "").upper()
-            if tl not in valid_levels:
+            if tl not in _VALID_THREAT_LEVELS:
                 briefing["threat_level"] = "MODERATE"
 
             briefing.setdefault("what_to_do", [])
