@@ -16,7 +16,7 @@
 
 AI-powered threat intelligence platform that aggregates 155+ RSS feeds, dark web sources, and NewsAPI — classifies, deduplicates, and generates analyst-grade intelligence digests with AI-curated top stories, incident clustering, threat actor profiles, and actionable priority recommendations with source citations. Runs entirely free using Groq's API free tier. Self-hosted, zero-cost infrastructure.
 
-[Features](#features) · [Quick start](#quick-start) · [Configuration](#configuration) · [Architecture](#architecture) · [API](#api-endpoints) · [Contributing](#contributing)
+[Features](#features) · [Quick start](#quick-start) · [Configuration](#configuration) · [Architecture](#architecture) · [API](#api-endpoints) · [Integrations](docs/INTEGRATIONS.md) · [Contributing](#contributing)
 
 </div>
 
@@ -256,6 +256,11 @@ Dockerfile                   # Python 3.11-slim based
 ---
 
 ## API endpoints
+
+> **Building an integration?** See [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md)
+> for copy-paste recipes — daily briefing → Microsoft Teams via Azure Logic App,
+> incremental IOC alerts to Slack/Teams, STIX 2.1 ingest into Sentinel/Splunk/Elastic,
+> RSS in Outlook/Feedly, plus the built-in webhook dispatcher.
 
 The server runs on port **8098** by default:
 
