@@ -268,8 +268,26 @@ parallel without one path muting the other.
 when a new article references a CVE that CISA has flagged as actively
 exploited in the wild. Permanent dedup — once a CVE is alerted, it never
 re-alerts even if more articles cover it. Capped at 5 alerts per pipeline
-batch to prevent flooding on backfill / first-deploy. No additional env
-vars; gated by the same `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`.
+batch to prevent flooding on backfill / first-deploy. Gated by the same
+`TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`, plus one tunable:
+
+```bash
+TELEGRAM_KEV_MAX_AGE_DAYS=14   # suppress KEV alerts older than N days
+                               # (set to 0 to alert every never-seen CVE)
+```
+
+CISA can list a CVE months/years after publication, and articles can
+resurface a long-stale entry — alerting either as breaking news is
+misleading. The default 14d cutoff focuses the channel on freshly-listed
+CVEs. CVEs older than the cutoff are silently stamped into the dedup
+state so they never alert AND never retry. Malformed/missing `date_added`
+falls through to normal alerting (defensive).
+
+Dispatch runs against the **full corpus** (`data/output/daily_latest.json`)
+not just the new fetch batch — most KEV-tagged articles are older items
+already deduped out, so per-batch dispatch missed them. Re-applies the
+KEV enricher inline so a CVE freshly added to KEV by CISA is picked up on
+older articles too.
 
 State file: `data/state/telegram_kev_alerts.json` (delete to re-allow
 alerts for previously-seen CVEs). Fires from the fetch pipeline so alerts

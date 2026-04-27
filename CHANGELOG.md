@@ -2,6 +2,25 @@
 
 All notable changes to ThreatWatch are documented here.
 
+## 2026-04-27 — Telegram outage RCA + fixes (briefing TPM, KEV full-corpus dispatch, 14d age cutoff)
+
+Context: Telegram channel had been silent since 2026-04-26. Two independent root causes converged. Both fixed and pushed; 12 KEV alerts fired in the first hour after the fix landed (5 from manual force-run + 7 from natural pipeline ticks).
+
+### Fixed
+- **Briefing crossed Groq's per-request 6K TPM cap (`modules/config.py`, `modules/briefing_generator.py`, `docker-compose.yml`)**: every briefing 429'd on every key for 28h+ straight while classify/attack_llm/regional kept succeeding (their per-call sizes were under 6K). Critical insight: Groq's free-tier 6K TPM is enforced **per-request**, not just per-minute throughput — 3 rotating keys do NOT raise the per-call ceiling, and switching 70B→8B doesn't help (same 6K cap on all free-tier models). Fix: switch the global briefing call to `llama-3.1-8b-instant` (env: `BRIEFING_MODEL`), drop `_MAX_BRIEFING_ARTICLES` 80→40, `_DIGEST_SUMMARY_CHARS` 250→80, `max_tokens` 2000→1200. Real probe: 4,450 prompt + 473 completion = 4,933 tokens (~350 token margin under cap). Regional briefings keep the 80-article cap (their per-call size was already fine).
+- **KEV alerts dispatched against the new fetch batch only (`threatdigest_main.py`)**: most KEV-tagged articles are older items already deduplicated out (CVE coverage takes hours/days to surface; CISA can list a CVE long after the article was first enriched). Result: `KEV: flagged 0 articles` every tick despite 12+ KEV CVEs in the live corpus. Fix: dispatch against `all_articles` (full `daily_latest.json` corpus) with KEV enricher re-applied so newly-listed CVEs are caught on older articles.
+- **`scripts/cleanup.py` ModuleNotFoundError at scheduler startup**: missing `sys.path` bootstrap caused `from modules.config import ...` to crash on every scheduler tick (cleanup ran with exit code 1, then pipeline continued without cleanup). Added the standard 2-line bootstrap.
+
+### Added
+- **TELEGRAM_KEV_MAX_AGE_DAYS (default 14) (`modules/telegram.py`)**: suppresses KEV alerts whose `date_added` is older than the cutoff. Stale CVEs are silently stamped into the dedup state so they never alert AND never retry on later runs. Set to 0 to disable the filter (alerts every never-before-seen KEV CVE — pre-2026-04-27 behavior). Defensive: missing or unparseable `date_added` falls through to the main loop instead of being silently silenced. Necessary because today's full-corpus dispatch fix initially fired alerts for 5 CVEs that have been on KEV for 90+ days (oldest = 315 days) — technically still "actively exploited" per CISA, but alerting a year-old listing as breaking news was misleading.
+
+### Operations
+- **Briefing model is env-tunable (`BRIEFING_MODEL` in `.env`)**, default `llama-3.1-8b-instant`. Set to `llama-3.3-70b-versatile` only if the prompt is also brought back under 6K (today it isn't).
+- **Backfill drain complete** for KEV alerts: 12 alerts sent, 12 KEV CVEs in corpus, 0 pending. From here on only freshly-listed CVEs (within `TELEGRAM_KEV_MAX_AGE_DAYS`) trigger alerts.
+
+### Testing
+- 142 tests pass on the changed surface (`test_briefing_generator`, `test_briefing_gen`, `test_telegram`, `test_kev_enricher`). +4 new telegram tests for the cutoff: stale-silenced-not-sent, fresh-alerts, filter-off (`=0`), malformed-date fallthrough.
+
 ## 2026-04-25 — Cache-staleness fixes, historical enrichment backfills, top_stories on 8B
 
 Context: the free-tier capitalization features shipped 2026-04-23 were verified live this session — `cve_narrative`, `ttp_extract`, and `attack_llm` all firing in production telemetry. Two regressions surfaced and got fixed: top_stories had been silently returning stale 28-hour-old selections (cache had no TTL), and once that fix landed it 429'd every cycle because its 70B prompt loses TPM contention against briefing/regional that fire seconds before. 1129 historical articles were also backfilled with the new enrichers (366 TTPs, 37 CVE narratives, 446 summaries) — ~63% of the ~2300-article corpus brought up to current enrichment standards in one pass.
