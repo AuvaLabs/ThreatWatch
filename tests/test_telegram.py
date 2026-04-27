@@ -304,6 +304,68 @@ class TestDispatchKEVAlerts:
             assert "https://example.test" in text
 
 
+    def _today_minus(self, days: int) -> str:
+        return (datetime.now(timezone.utc).date() - timedelta(days=days)).isoformat()
+
+    def test_old_kev_silenced_not_alerted(self, tmp_path):
+        """CVEs whose date_added is older than the cutoff are stamped into
+        state without sending — so they never alert and never retry."""
+        state_path = tmp_path / "k.json"
+        article = _kev_article("CVE-2026-1001", date_added=self._today_minus(100))
+        with patch.object(tg, "TELEGRAM_BOT_TOKEN", "abc"), \
+             patch.object(tg, "TELEGRAM_CHAT_ID", "@x"), \
+             patch.object(tg, "_KEV_STATE_PATH", state_path), \
+             patch.object(tg, "TELEGRAM_KEV_MAX_AGE_DAYS", 14), \
+             patch("modules.telegram._get_session") as mock_sess:
+            sent = tg.dispatch_telegram_kev_alerts([article])
+            assert sent == 0
+            mock_sess.assert_not_called()
+            import json as _json
+            saved = _json.loads(state_path.read_text())
+            assert "CVE-2026-1001" in saved  # silenced, not alerted
+
+    def test_fresh_kev_within_cutoff_alerts(self, tmp_path):
+        """CVEs within the cutoff window alert as usual."""
+        article = _kev_article("CVE-2026-1002", date_added=self._today_minus(5))
+        with patch.object(tg, "TELEGRAM_BOT_TOKEN", "abc"), \
+             patch.object(tg, "TELEGRAM_CHAT_ID", "@x"), \
+             patch.object(tg, "_KEV_STATE_PATH", tmp_path / "k.json"), \
+             patch.object(tg, "TELEGRAM_KEV_MAX_AGE_DAYS", 14), \
+             patch("modules.telegram._get_session") as mock_sess:
+            mock_sess.return_value.post.return_value.raise_for_status.return_value = None
+            sent = tg.dispatch_telegram_kev_alerts([article])
+            assert sent == 1
+            assert mock_sess.return_value.post.call_count == 1
+
+    def test_filter_disabled_when_zero(self, tmp_path):
+        """TELEGRAM_KEV_MAX_AGE_DAYS=0 disables the filter — even ancient
+        CVEs alert (back to pre-2026-04-27 behavior)."""
+        article = _kev_article("CVE-2024-0001", date_added=self._today_minus(500))
+        with patch.object(tg, "TELEGRAM_BOT_TOKEN", "abc"), \
+             patch.object(tg, "TELEGRAM_CHAT_ID", "@x"), \
+             patch.object(tg, "_KEV_STATE_PATH", tmp_path / "k.json"), \
+             patch.object(tg, "TELEGRAM_KEV_MAX_AGE_DAYS", 0), \
+             patch("modules.telegram._get_session") as mock_sess:
+            mock_sess.return_value.post.return_value.raise_for_status.return_value = None
+            sent = tg.dispatch_telegram_kev_alerts([article])
+            assert sent == 1
+
+    def test_malformed_date_does_not_silence(self, tmp_path):
+        """Missing/garbage date_added falls through to the main loop instead
+        of being silently silenced (defensive — bad data shouldn't permanently
+        suppress a CVE that might be valid in a fresh catalog fetch)."""
+        state_path = tmp_path / "k.json"
+        article = _kev_article("CVE-2026-1003", date_added="not-a-date")
+        with patch.object(tg, "TELEGRAM_BOT_TOKEN", "abc"), \
+             patch.object(tg, "TELEGRAM_CHAT_ID", "@x"), \
+             patch.object(tg, "_KEV_STATE_PATH", state_path), \
+             patch.object(tg, "TELEGRAM_KEV_MAX_AGE_DAYS", 14), \
+             patch("modules.telegram._get_session") as mock_sess:
+            mock_sess.return_value.post.return_value.raise_for_status.return_value = None
+            sent = tg.dispatch_telegram_kev_alerts([article])
+            assert sent == 1  # alerted (date couldn't be parsed → not silenced)
+
+
 # ---------------------------------------------------------------------------
 # post_briefing_unconditional (used by the cron script)
 # ---------------------------------------------------------------------------

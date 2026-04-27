@@ -19,7 +19,7 @@ import json
 import logging
 import os
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from html import escape as _html_escape
 from pathlib import Path
 
@@ -35,6 +35,12 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 TELEGRAM_MIN_LEVEL = os.environ.get("TELEGRAM_MIN_LEVEL", "ELEVATED").upper()
 TELEGRAM_COOLDOWN_HOURS = float(os.environ.get("TELEGRAM_COOLDOWN_HOURS", "6"))
+# CISA can list a CVE months/years after first publication, and articles can
+# resurface a long-stale entry — alerting either as breaking news is misleading.
+# Suppress KEV alerts for entries older than this many days (date_added relative
+# to today). Set to 0 to disable the filter and alert every never-before-seen
+# KEV CVE. 14d catches "freshly listed" without flooding on backfill.
+TELEGRAM_KEV_MAX_AGE_DAYS = int(os.environ.get("TELEGRAM_KEV_MAX_AGE_DAYS", "14"))
 TELEGRAM_DASHBOARD_URL = os.environ.get(
     "TELEGRAM_DASHBOARD_URL", "https://threatwatch.auvalabs.com"
 )
@@ -285,6 +291,36 @@ def dispatch_telegram_kev_alerts(articles: list[dict]) -> int:
         return 0
 
     state = _load_json_state(_KEV_STATE_PATH)
+
+    # Suppression pre-pass: silently mark CVEs whose KEV date_added is older
+    # than the configured cutoff so they never alert (and never retry). This
+    # runs BEFORE by_cve construction so the existing `cve in state` check
+    # naturally skips them in the send loop. Stale entries with malformed
+    # or missing date_added fall through to the main loop unchanged
+    # (defensive — bad data shouldn't permanently silence a CVE).
+    if TELEGRAM_KEV_MAX_AGE_DAYS > 0:
+        cutoff = datetime.now(timezone.utc).date() - timedelta(days=TELEGRAM_KEV_MAX_AGE_DAYS)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        suppressed = 0
+        for art in articles:
+            for entry in art.get("kev_entries") or []:
+                cve = (entry.get("cve_id") or "").upper()
+                if not cve or cve in state or not _CVE_ID_RE.match(cve):
+                    continue
+                try:
+                    listed = datetime.strptime(entry.get("date_added") or "", "%Y-%m-%d").date()
+                except ValueError:
+                    continue
+                if listed < cutoff:
+                    state[cve] = now_iso
+                    suppressed += 1
+        if suppressed:
+            _save_json_state(_KEV_STATE_PATH, state)
+            logger.info(
+                "Telegram KEV alerts: suppressed %d CVE(s) older than %d days",
+                suppressed, TELEGRAM_KEV_MAX_AGE_DAYS,
+            )
+
     sent = 0
     # Group articles by CVE so a single CVE referenced by 5 articles is
     # one alert, not five. Picks the earliest date_added entry per CVE
