@@ -34,12 +34,12 @@ _MAX_SUMMARIES_PER_RUN = int(os.environ.get("MAX_SUMMARIES_PER_RUN", "150"))
 _SUMMARY_PROMPT = """You are a cyber threat intelligence analyst. For each article, extract key intelligence details in a structured format.
 
 Rules:
+- GROUNDING (CRITICAL): Use ONLY identifiers (actor names, CVE IDs, organizations, products, numbers) that appear in the article's title or content snippet below. Tokens shown in angle-bracket form (<ACTOR>, <VICTIM>, <COUNT>) in these instructions are schema placeholders, not data — never echo them or fabricate similar-looking values. If a field is unknown from the content, use null — do not invent.
 - Keep each field concise (under 80 chars per field)
-- "what": the incident or event (e.g. "ransomware attack", "data breach", "vulnerability disclosed")
-- "who": affected organization, threat actor, or both (e.g. "LockBit targeted NHS hospitals")
-- "impact": the consequence or scale (e.g. "500K records exposed", "systems offline for 3 days")
-- "summary": 1 sentence combining the above into a readable intelligence summary
-- If a field is unknown from the content, use null
+- "what": the incident or event in generic terms (e.g. "ransomware attack", "data breach", "vulnerability disclosed")
+- "who": affected organization, threat actor, or both — extracted verbatim from the content. Style template: "<ACTOR> targeted <VICTIM>". Use null if neither is named.
+- "impact": the consequence or scale, extracted verbatim. Style template: "<COUNT> records exposed" or "systems offline for <N> days". Use null if no impact figure is in the content.
+- "summary": 1 sentence combining the above into a readable intelligence summary, citing only entities present in the content
 - For CVE/vulnerability articles, include product and severity in "what"
 - Return ONLY valid JSON array — no markdown, no explanation
 

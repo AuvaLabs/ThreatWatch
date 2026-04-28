@@ -48,7 +48,7 @@ def _valid_briefing(**overrides):
         "sector_impact": ["Healthcare — targeted by LockBit", "Finance — credential theft campaigns"],
         "priority_actions": [
             {"action": "Enable MFA on all admin accounts", "threat_context": "Credential theft campaigns"},
-            {"action": "Patch CVE-2026-1234 in OpenSSL", "threat_context": "Active exploitation observed"},
+            {"action": "Patch OpenSSL to the latest release", "threat_context": "Active exploitation observed"},
         ],
     }
     base.update(overrides)

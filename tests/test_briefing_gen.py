@@ -488,3 +488,80 @@ class TestRegionalBriefingPersistence:
         monkeypatch.setattr(bg, "OUTPUT_DIR", tmp_path / "empty")
         # No files written — should return empty dict.
         assert bg.load_all_regional_briefings() == {}
+
+
+class TestCveGrounding:
+    """Block hallucinated CVE IDs from leaking into briefings.
+
+    Regression: the model echoed a CVE ID that only existed in the prompt's
+    style examples, surfacing as a false CRITICAL alert on Telegram. The
+    guard rejects any briefing citing a CVE that isn't in the article digest.
+    """
+
+    def test_no_cves_means_grounded(self):
+        briefing = {"what_happened": "Generic ransomware activity continues.",
+                    "headline": "Quiet day."}
+        assert bg._validate_cve_grounding(briefing, "BEGIN INCIDENT DATA\n...\nEND") == set()
+
+    def test_cited_cve_present_in_source_passes(self):
+        briefing = {"what_happened": "CVE-2025-1111 actively exploited."}
+        source = "[1] CVE-2025-1111 affects Cisco devices"
+        assert bg._validate_cve_grounding(briefing, source) == set()
+
+    def test_cited_cve_absent_from_source_is_flagged(self):
+        # Mirrors the production incident: model echoed CVE-2026-1234 from the
+        # prompt's example clause, with no such CVE anywhere in the digest.
+        briefing = {"what_happened": "CVE-2026-1234 added to KEV."}
+        source = "[1] LockBit attack on hospital\n[2] APT41 campaign"
+        assert bg._validate_cve_grounding(briefing, source) == {"CVE-2026-1234"}
+
+    def test_grounding_checks_all_text_fields(self):
+        briefing = {
+            "headline": "Quiet day.",
+            "what_happened": "Generic activity.",
+            "outlook": "CVE-2099-9999 may emerge.",
+            "what_to_do": [{"action": "Patch CVE-2099-1111", "threat": "x"}],
+        }
+        ungrounded = bg._validate_cve_grounding(briefing, "no CVEs in source")
+        assert ungrounded == {"CVE-2099-9999", "CVE-2099-1111"}
+
+    def test_case_insensitive_match(self):
+        briefing = {"what_happened": "cve-2025-2222 is bad."}
+        source = "Article mentions CVE-2025-2222 in the body"
+        assert bg._validate_cve_grounding(briefing, source) == set()
+
+    def test_extract_cited_handles_malformed_what_to_do(self):
+        # Legacy/edge-case shapes must not crash the validator.
+        briefing = {"what_to_do": ["bare string", None, {"action": None}]}
+        assert bg._extract_cited_cve_ids(briefing) == set()
+
+    def test_generation_rejects_ungrounded_cve_and_serves_stale(self, tmp_path):
+        """End-to-end: a fabricated CVE in the LLM reply must NOT be saved.
+
+        The pipeline serves the prior on-disk briefing instead.
+        """
+        existing = {"threat_level": "MODERATE", "what_happened": "yesterday's news"}
+        llm_reply = json.dumps({
+            "threat_level": "CRITICAL",
+            "what_happened": "CVE-2026-1234 added to KEV — critical exploitation.",
+            "headline": "CVE-2026-1234 actively exploited.",
+        })
+        articles = [_article(title="Ransomware roundup",
+                             timestamp=datetime.now(timezone.utc).isoformat())
+                    for _ in range(20)]
+        with patch.object(bg, "_detect_provider", return_value="openai"), \
+             patch.object(bg, "get_cached_result", return_value=None), \
+             patch.object(bg, "_is_rate_limited", return_value=False), \
+             patch.object(bg, "_call_openai_compatible", return_value=llm_reply), \
+             patch.object(bg, "_parse_json", return_value=json.loads(llm_reply)), \
+             patch.object(bg, "_record_api_call"), \
+             patch.object(bg, "cache_result"), \
+             patch.object(bg, "_save_briefing") as save_mock, \
+             patch.object(bg, "load_briefing", return_value=existing), \
+             patch.object(bg, "BRIEFING_MODEL", "test-model"), \
+             patch.object(bg, "_build_trend_context", return_value=""), \
+             patch.object(bg, "_build_vuln_context", return_value=""):
+            result = bg.generate_briefing(articles)
+        # Stale briefing served, fabricated brief never reached disk.
+        assert result == existing
+        save_mock.assert_not_called()

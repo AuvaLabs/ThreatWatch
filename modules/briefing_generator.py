@@ -44,13 +44,14 @@ THREAT LEVEL:
 - GUARDED/LOW: Below-average activity
 
 RULES:
+- GROUNDING (CRITICAL): Cite ONLY CVE IDs, dates, threat-actor names, victim organizations, products, and other identifiers that appear verbatim in the article digest or vulnerability context below. Any token shown in these instructions in angle-bracket form (e.g. <CVE-ID>, <YYYY-MM-DD>, <ACTOR>, <PRODUCT>, <NN>%) is a schema placeholder, NOT data — never echo it or fabricate similar-looking IDs. If no qualifying CVE/actor/etc. exists in the data, do not invent one — write the section without that detail.
 - Name SPECIFIC threat actors, CVEs, organizations, malware — never say "ransomware is increasing" without naming which groups and victims
 - Every claim must cite source article numbers [N] in the "sources" array
-- "headline" is the front-of-page TL;DR — 1 sentence, ≤140 chars, leading with the SINGLE most impactful item from what_happened. Name the specific actor/CVE/victim. Active voice. No throat-clearing ("Over the last 24 hours...", "Several incidents..."). Examples of good vs bad: GOOD = "CISA adds Cisco ASA zero-day CVE-2026-1234 to KEV after Volt Typhoon mass exploitation." BAD = "There were several significant cybersecurity events today including..."
+- "headline" is the front-of-page TL;DR — 1 sentence, ≤140 chars, leading with the SINGLE most impactful item from what_happened. Name the specific actor/CVE/victim from the digest. Active voice. No throat-clearing ("Over the last 24 hours...", "Several incidents..."). Style template (replace placeholders with real values from the digest): GOOD = "CISA adds <PRODUCT> zero-day <CVE-ID> to KEV after <ACTOR> mass exploitation." BAD = "There were several significant cybersecurity events today including..."
 - "what_happened" is the MAIN SECTION — write it as a narrative that covers the most significant incidents, weaving in trending patterns, CVE details, and ATT&CK tactics. Do NOT repeat information across sections.
 - "what_to_do" actions must reference the SPECIFIC threats from what_happened — never generic ("patch your systems", "train employees")
-- KEV-listed CVEs (marked "KEV-listed [date]" in the vuln context) are CONFIRMED exploited in the wild by CISA — when one appears, lead with it and surface the KEV status explicitly (e.g., "CVE-2026-3844 was added to the CISA KEV catalog on 2026-04-25, confirming active in-the-wild exploitation"). Mark the matching what_to_do action as urgent.
-- If CVEs have EPSS scores, include them in the narrative (e.g., "CVE-2026-5212 affecting D-Link routers has a 94% EPSS exploitation probability — patch immediately"). EPSS = probability; KEV = confirmed fact. Prefer KEV phrasing when both exist.
+- KEV-listed CVEs (marked "KEV-listed [date]" in the vuln context) are CONFIRMED exploited in the wild by CISA — when one appears, lead with it and surface the KEV status explicitly. Style template: "<CVE-ID> was added to the CISA KEV catalog on <YYYY-MM-DD>, confirming active in-the-wild exploitation." Use the actual CVE ID and date from the vulnerability context, not the placeholders. Mark the matching what_to_do action as urgent.
+- If CVEs have EPSS scores, include them in the narrative. Style template: "<CVE-ID> affecting <PRODUCT> has a <NN>% EPSS exploitation probability — patch immediately." EPSS = probability; KEV = confirmed fact. Prefer KEV phrasing when both exist.
 - If EARLIER THIS WEEK data is provided, write a "week_in_review" catching readers up on what they missed
 - "outlook" should project what SPECIFIC developments mean for the next 7-30 days
 
@@ -101,6 +102,36 @@ _HEADLINE_SOFT_CAP = 160   # belt-and-braces trim if model overshoots the prompt
 # digest stays under Groq free-tier 6K TPM ceiling. Lift if the briefing moves
 # to a paid tier or larger context model.
 _DIGEST_SUMMARY_CHARS = 80
+
+
+def _extract_cited_cve_ids(briefing: dict[str, Any]) -> set[str]:
+    """Return uppercase CVE IDs cited anywhere in the briefing's text fields."""
+    from modules.entities import CVE_RE
+    cited: set[str] = set()
+    for field in ("headline", "assessment_basis", "what_happened",
+                  "week_in_review", "outlook"):
+        text = briefing.get(field) or ""
+        if isinstance(text, str):
+            cited.update(m.upper() for m in CVE_RE.findall(text))
+    for action in briefing.get("what_to_do") or []:
+        if isinstance(action, dict):
+            for k in ("action", "threat"):
+                v = action.get(k) or ""
+                if isinstance(v, str):
+                    cited.update(m.upper() for m in CVE_RE.findall(v))
+    return cited
+
+
+def _validate_cve_grounding(briefing: dict[str, Any], source_text: str) -> set[str]:
+    """Return the set of CVE IDs cited in the briefing but NOT in source_text.
+
+    A non-empty return value means the LLM fabricated identifiers (most often
+    by echoing schema-example IDs from the prompt) and the briefing must be
+    rejected — a false CRITICAL alert is far worse than a stale or missing one.
+    """
+    from modules.entities import CVE_RE
+    allowed = {m.upper() for m in CVE_RE.findall(source_text or "")}
+    return _extract_cited_cve_ids(briefing) - allowed
 
 
 def _normalise_headline(raw: str | None) -> str:
@@ -512,6 +543,18 @@ def generate_briefing(articles: list[dict[str, Any]]) -> dict[str, Any] | None:
         # frontend's regex distillation of what_happened take over.
         briefing["headline"] = _normalise_headline(briefing.get("headline"))
 
+        # Guard against ungrounded CVE IDs (prompt-example leakage / hallucination).
+        # A false CRITICAL alert citing a fabricated CVE is worse than a stale brief.
+        ungrounded = _validate_cve_grounding(briefing, user_content)
+        if ungrounded:
+            logger.warning(
+                "Briefing rejected — cited ungrounded CVE IDs %s. "
+                "Likely prompt-example leak or hallucination; serving stale.",
+                sorted(ungrounded),
+            )
+            existing = load_briefing()
+            return existing if existing else None
+
         # Build source article map so frontend can resolve [N] → link/title
         source_map = []
         for i, a in enumerate(briefing_articles[:_MAX_BRIEFING_ARTICLES], 1):
@@ -751,6 +794,14 @@ def generate_regional_briefings(articles: list[dict[str, Any]]) -> dict[str, Any
             briefing.setdefault("what_to_do", [])
             briefing.setdefault("outlook", "")
             briefing["headline"] = _normalise_headline(briefing.get("headline"))
+
+            ungrounded = _validate_cve_grounding(briefing, user_content)
+            if ungrounded:
+                logger.warning(
+                    "Regional digest (%s) rejected — ungrounded CVE IDs %s.",
+                    region_name, sorted(ungrounded),
+                )
+                continue
 
             # Source article map
             source_map = []

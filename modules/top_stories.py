@@ -200,6 +200,27 @@ def generate_top_stories(articles: list[dict[str, Any]]) -> list[dict[str, Any]]
 
         stories = result["top_stories"]
 
+        # Drop stories citing ungrounded CVE IDs. Same threat as the briefing
+        # generator: the model can echo CVE-like tokens that aren't in the
+        # source corpus. Per-story drop (not whole-batch reject) — a
+        # hallucinated story among 5-8 shouldn't poison the rest.
+        from modules.entities import CVE_RE
+        allowed_cves = {m.upper() for m in CVE_RE.findall(user_content)}
+        grounded_stories = []
+        for story in stories:
+            cited = {m.upper() for m in CVE_RE.findall(
+                f"{story.get('headline', '')} {story.get('summary', '')}"
+            )}
+            ungrounded = cited - allowed_cves
+            if ungrounded:
+                logger.warning(
+                    "Top-stories drop — ungrounded CVE IDs %s in story: %r",
+                    sorted(ungrounded), story.get("headline", "")[:80],
+                )
+                continue
+            grounded_stories.append(story)
+        stories = grounded_stories
+
         # Enrich with source article data (from filtered list, not raw)
         for story in stories:
             idx = story.get("article_index", 0) - 1  # 1-indexed in prompt
