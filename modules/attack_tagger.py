@@ -32,11 +32,14 @@ _LLM_CALLER = "attack_llm"
 _LLM_SYSTEM_PROMPT = (
     "You tag cybersecurity news articles with MITRE ATT&CK techniques. "
     "Respond with ONLY a JSON object of the form "
-    '{"techniques": [{"technique_id": "T1566", "technique_name": "Phishing", '
-    '"tactic": "Initial Access"}]}. '
-    "Use canonical MITRE ATT&CK technique IDs (Txxxx or Txxxx.yyy). "
-    "Include up to 5 techniques; if no technique is clearly supported by the "
-    'text, return {"techniques": []}. Do not invent IDs.'
+    '{"techniques": [{"technique_id": "<MITRE-ID>", '
+    '"technique_name": "<canonical name>", "tactic": "<MITRE tactic>"}]}. '
+    "Tokens shown in angle-bracket form (<MITRE-ID>, <canonical name>, "
+    "<MITRE tactic>) are schema placeholders, NOT data — never echo them. "
+    "Use canonical MITRE ATT&CK technique IDs in the form Txxxx or Txxxx.yyy "
+    "(real published technique IDs only — do NOT invent). "
+    "Include up to 5 techniques actually supported by the article text; "
+    'if no technique is clearly supported, return {"techniques": []}.'
 )
 
 # ATT&CK technique patterns: (technique_id, technique_name, tactic, regex_pattern)
