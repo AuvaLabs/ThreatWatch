@@ -565,3 +565,99 @@ class TestCveGrounding:
         # Stale briefing served, fabricated brief never reached disk.
         assert result == existing
         save_mock.assert_not_called()
+
+
+class TestProperNounExtraction:
+    """Underlies the headline narrative-coupling guard."""
+
+    def test_extracts_capitalized_proper_nouns(self):
+        nouns = bg._extract_proper_nouns(
+            "Vimeo confirms Anodot breach; ShinyHunters claim credit."
+        )
+        assert "Vimeo" in nouns
+        assert "Anodot" in nouns
+        assert "ShinyHunters" in nouns
+
+    def test_drops_security_jargon(self):
+        nouns = bg._extract_proper_nouns(
+            "Multiple Vulnerabilities Exploited Today By Hackers; CVE released."
+        )
+        # All of these should be stop-worded — none are entity-identifying.
+        assert nouns == set()
+
+    def test_handles_punctuation_and_hyphens(self):
+        nouns = bg._extract_proper_nouns("Cisco-IOS issue affects ASA appliances.")
+        assert "Cisco-IOS" in nouns
+        assert "ASA" in nouns
+
+    def test_empty_text(self):
+        assert bg._extract_proper_nouns("") == set()
+        assert bg._extract_proper_nouns(None) == set()
+
+
+class TestHeadlineGrounding:
+    """Block headlines that fuse entities from unrelated source articles.
+
+    Regression: a briefing's headline read 'Vimeo confirms Anodot breach
+    exposed user data, attackers exploited vulnerability CVE-2026-41205'.
+    Vimeo/Anodot were one source article; CVE-2026-41205 (Mako template)
+    was a different unrelated article. The guard must catch this.
+    """
+
+    def _articles(self):
+        return [
+            {"title": "Video service Vimeo confirms Anodot breach exposed user data",
+             "summary": "Vimeo disclosed a breach via partner Anodot."},
+            {"title": "CVE-2026-41205: HIGH (7.5) — Mako template library path traversal",
+             "summary": "Mako prior to 1.3.11 vulnerable to path traversal."},
+        ]
+
+    def test_grounded_headline_passes(self):
+        briefing = {
+            "headline": "Vimeo confirms Anodot breach exposed user data.",
+            "headline_source": 1,
+        }
+        assert bg._validate_headline_grounding(briefing, self._articles()) is None
+
+    def test_conflated_entities_rejected(self):
+        # The exact production failure: CVE from article 2, victim from article 1.
+        briefing = {
+            "headline": "Vimeo confirms Anodot breach, attackers exploited CVE-2026-41205.",
+            "headline_source": 1,  # Vimeo article — but cites Mako CVE
+        }
+        reason = bg._validate_headline_grounding(briefing, self._articles())
+        assert reason is not None
+        assert "CVE-2026-41205" in reason
+
+    def test_proper_noun_not_in_source_rejected(self):
+        # Headline names a victim that isn't in the linked article.
+        briefing = {
+            "headline": "Cisco zero-day exploited in Vimeo breach.",
+            "headline_source": 2,  # Mako article — names neither Cisco nor Vimeo
+        }
+        reason = bg._validate_headline_grounding(briefing, self._articles())
+        assert reason is not None
+
+    def test_missing_headline_source_rejected(self):
+        briefing = {"headline": "Vimeo confirms Anodot breach."}
+        reason = bg._validate_headline_grounding(briefing, self._articles())
+        assert reason is not None
+        assert "headline_source" in reason
+
+    def test_invalid_headline_source_index(self):
+        briefing = {"headline": "Anything.", "headline_source": 99}
+        reason = bg._validate_headline_grounding(briefing, self._articles())
+        assert reason is not None
+
+    def test_empty_headline_passes(self):
+        # Empty headline = frontend fallback will distill from what_happened.
+        briefing = {"headline": "", "headline_source": 1}
+        assert bg._validate_headline_grounding(briefing, self._articles()) is None
+
+    def test_string_typed_index_accepted(self):
+        # LLMs sometimes return "1" instead of 1. Tolerate it.
+        briefing = {
+            "headline": "Vimeo confirms Anodot breach exposed user data.",
+            "headline_source": "1",
+        }
+        assert bg._validate_headline_grounding(briefing, self._articles()) is None

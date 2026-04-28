@@ -200,24 +200,64 @@ def generate_top_stories(articles: list[dict[str, Any]]) -> list[dict[str, Any]]
 
         stories = result["top_stories"]
 
-        # Drop stories citing ungrounded CVE IDs. Same threat as the briefing
-        # generator: the model can echo CVE-like tokens that aren't in the
-        # source corpus. Per-story drop (not whole-batch reject) — a
-        # hallucinated story among 5-8 shouldn't poison the rest.
+        # Drop stories citing ungrounded CVE IDs OR welding entities from
+        # outside the linked article_index. Same threat as the briefing
+        # generator: the model can echo CVE-like tokens or fuse a CVE from
+        # one article onto a victim from another. Per-story drop (not
+        # whole-batch reject) — a hallucinated story among 5-8 shouldn't
+        # poison the rest.
         from modules.entities import CVE_RE
+        from modules.briefing_generator import _extract_proper_nouns
         allowed_cves = {m.upper() for m in CVE_RE.findall(user_content)}
         grounded_stories = []
         for story in stories:
-            cited = {m.upper() for m in CVE_RE.findall(
-                f"{story.get('headline', '')} {story.get('summary', '')}"
-            )}
-            ungrounded = cited - allowed_cves
-            if ungrounded:
+            story_text = f"{story.get('headline', '')} {story.get('summary', '')}"
+            cited = {m.upper() for m in CVE_RE.findall(story_text)}
+            ungrounded_cves = cited - allowed_cves
+            if ungrounded_cves:
                 logger.warning(
                     "Top-stories drop — ungrounded CVE IDs %s in story: %r",
-                    sorted(ungrounded), story.get("headline", "")[:80],
+                    sorted(ungrounded_cves), story.get("headline", "")[:80],
                 )
                 continue
+
+            # Verify proper nouns / cited CVEs in story trace to the linked
+            # article (not the whole corpus). Stops the case where the LLM
+            # picks article_index=N but writes a headline about article M's
+            # entities — the same narrative-coupling failure that hit the
+            # global briefing.
+            idx = story.get("article_index", 0) - 1
+            if 0 <= idx < len(briefing_articles):
+                src = briefing_articles[idx]
+                src_text = " ".join([
+                    src.get("title") or "",
+                    src.get("translated_title") or "",
+                    src.get("summary") or "",
+                ])
+                src_text_lower = src_text.lower()
+                src_cves = {m.upper() for m in CVE_RE.findall(src_text)}
+                missing_cves = cited - src_cves
+                if missing_cves:
+                    logger.warning(
+                        "Top-stories drop — story cites CVEs %s not in linked "
+                        "article #%d: %r",
+                        sorted(missing_cves), idx + 1,
+                        story.get("headline", "")[:80],
+                    )
+                    continue
+                missing_nouns = {
+                    n for n in _extract_proper_nouns(story_text)
+                    if n.lower() not in src_text_lower
+                }
+                if missing_nouns:
+                    logger.warning(
+                        "Top-stories drop — story names %s not in linked "
+                        "article #%d: %r",
+                        sorted(missing_nouns), idx + 1,
+                        story.get("headline", "")[:80],
+                    )
+                    continue
+
             grounded_stories.append(story)
         stories = grounded_stories
 

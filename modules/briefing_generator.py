@@ -15,6 +15,7 @@ import json
 import logging
 import hashlib
 import os
+import re
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ RULES:
 - Name SPECIFIC threat actors, CVEs, organizations, malware — never say "ransomware is increasing" without naming which groups and victims
 - Every claim must cite source article numbers [N] in the "sources" array
 - "headline" is the front-of-page TL;DR — 1 sentence, ≤140 chars, leading with the SINGLE most impactful item from what_happened. Name the specific actor/CVE/victim from the digest. Active voice. No throat-clearing ("Over the last 24 hours...", "Several incidents..."). Style template (replace placeholders with real values from the digest): GOOD = "CISA adds <PRODUCT> zero-day <CVE-ID> to KEV after <ACTOR> mass exploitation." BAD = "There were several significant cybersecurity events today including..."
+- "headline_source" (CRITICAL): an integer — the SINGLE source article index [N] from the digest below that the headline is sourced from. Every named entity (CVE, actor, victim org, product) in the headline MUST appear in that one article. Do NOT fuse facts from two unrelated articles into one headline (e.g., do not put a CVE from article [2] alongside a victim from article [3] unless article [2] also names that victim).
 - "what_happened" is the MAIN SECTION — write it as a narrative that covers the most significant incidents, weaving in trending patterns, CVE details, and ATT&CK tactics. Do NOT repeat information across sections.
 - "what_to_do" actions must reference the SPECIFIC threats from what_happened — never generic ("patch your systems", "train employees")
 - KEV-listed CVEs (marked "KEV-listed [date]" in the vuln context) are CONFIRMED exploited in the wild by CISA — when one appears, lead with it and surface the KEV status explicitly. Style template: "<CVE-ID> was added to the CISA KEV catalog on <YYYY-MM-DD>, confirming active in-the-wild exploitation." Use the actual CVE ID and date from the vulnerability context, not the placeholders. Mark the matching what_to_do action as urgent.
@@ -59,6 +61,7 @@ Respond ONLY with valid JSON (no markdown, no code fences). All arrays must use 
 {
   "threat_level": "CRITICAL|ELEVATED|MODERATE|GUARDED|LOW",
   "headline": "<1 sentence, ≤140 chars: the single most important development right now. Active voice, named entities, no boilerplate openers.>",
+  "headline_source": <single integer — the source article index [N] this headline is sourced from. Every CVE/actor/victim/product named in the headline MUST appear in that one article.>,
   "assessment_basis": "<1 sentence: WHY this level, citing the key driver>",
   "what_happened": "<4-6 sentence narrative covering the most significant incidents from the last 24 hours. Name actors, victims, CVEs, and attack methods. Weave in trending patterns and vulnerability details rather than listing them separately. Each incident should be distinct — no repetition.>",
   "what_happened_sources": [1, 2, 3],
@@ -132,6 +135,138 @@ def _validate_cve_grounding(briefing: dict[str, Any], source_text: str) -> set[s
     from modules.entities import CVE_RE
     allowed = {m.upper() for m in CVE_RE.findall(source_text or "")}
     return _extract_cited_cve_ids(briefing) - allowed
+
+
+# Capitalized common-words and analyst jargon that aren't named entities. The
+# headline-coupling guard treats anything else (≥3 char, capitalized) as a
+# proper noun that must be traceable to the source article. Tuned to be lax —
+# the goal is to catch LLM fabrications like fusing two unrelated victims and
+# CVEs into one sentence, not to flag every adjective.
+_HEADLINE_ENTITY_STOPWORDS = frozenset({
+    # Articles, conjunctions, prepositions, demonstratives
+    "The", "And", "But", "For", "Nor", "With", "From", "Into", "Onto",
+    "This", "That", "These", "Those", "Such", "Some", "Most", "Many",
+    # Question words / time
+    "What", "When", "Where", "Why", "How", "Who", "Whom", "Whose", "Which",
+    "Today", "Yesterday", "Tomorrow", "Now", "Then", "After", "Before",
+    "Recently", "Currently", "Soon",
+    # Severity / threat-level vocabulary
+    "Critical", "Elevated", "Moderate", "Guarded", "High", "Medium", "Low",
+    "Severe", "Severity", "Urgent",
+    # Counters / quantifiers
+    "Multiple", "Several", "Various", "Numerous", "Few", "Many", "All", "Both",
+    "Million", "Thousand", "Hundred", "Billion",
+    # Generic security verbs/nouns commonly capitalized at clause start
+    "Active", "Confirms", "Confirmed", "Discloses", "Disclosed", "Reports",
+    "Reported", "Detects", "Detected", "Reveals", "Revealed", "Warns",
+    "Warned", "Targets", "Targeted", "Targeting", "Suspects", "Suspected",
+    "Linked", "Tied", "Allegedly", "Likely", "Probable", "Possible",
+    "Exploits", "Exploited", "Exploiting", "Exploitation", "Exploit",
+    "Attacks", "Attacked", "Attacking", "Attack", "Attackers", "Attacker",
+    "Hackers", "Hacker", "Hacked", "Hacks", "Hacking",
+    "Researchers", "Researcher", "Defenders", "Defender", "Investigators",
+    "Vulnerability", "Vulnerabilities", "Vulnerable", "Flaw", "Flaws",
+    "Patch", "Patches", "Patched", "Update", "Updates", "Updated",
+    "Breach", "Breaches", "Breached", "Compromise", "Compromised",
+    "Disclosure", "Disclosures", "Advisory", "Advisories",
+    "Campaign", "Campaigns", "Operation", "Operations",
+    "Ransomware", "Malware", "Spyware", "Phishing", "Smishing", "Vishing",
+    "Botnet", "Trojan", "Wiper", "Backdoor", "Loader",
+    # Generic objects of attacks
+    "User", "Users", "Customer", "Customers", "Client", "Clients",
+    "Account", "Accounts", "Credential", "Credentials", "Password", "Passwords",
+    "Data", "Records", "Record", "Email", "Emails", "Files", "File",
+    "Service", "Services", "Server", "Servers", "System", "Systems",
+    "Network", "Networks", "Cloud", "Endpoint", "Endpoints",
+    "Software", "Hardware", "Application", "Applications",
+    "Vendor", "Vendors", "Researcher",
+    "Source", "Sources",
+    # Days / months
+    "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+    # Generic security acronyms — too broad to identify a specific entity.
+    # CVE IDs are validated by the separate CVE grounding check, not here.
+    "CVE", "CVSS", "EPSS", "KEV", "RCE", "DoS", "DDoS", "XSS", "CSRF",
+    "URL", "API", "DNS", "TLS", "VPN", "HTTP", "HTTPS", "SSH", "FTP",
+    "SQL", "AI", "ML", "OS", "IT", "PII", "PHI",
+})
+
+# Capture capitalized tokens — supports "ShinyHunters", "PowerShell", "Cisco",
+# "L'Oreal". 3+ chars excludes most short pronouns. The leading-uppercase
+# anchor naturally skips lowercase verbs/nouns at sentence interior.
+_PROPER_NOUN_RE = re.compile(r"\b[A-Z][\w\-'.]{2,}\b")
+
+
+def _extract_proper_nouns(text: str) -> set[str]:
+    """Extract capitalized tokens that look like named entities.
+
+    Drops common security jargon (see `_HEADLINE_ENTITY_STOPWORDS`) so the
+    headline guard only fires on meaningful proper nouns (companies, actors,
+    products), not on words like "Multiple" or "Vulnerability" that just
+    happen to start a clause.
+    """
+    if not text:
+        return set()
+    return {tok for tok in _PROPER_NOUN_RE.findall(text)
+            if tok not in _HEADLINE_ENTITY_STOPWORDS}
+
+
+def _validate_headline_grounding(
+    briefing: dict[str, Any],
+    briefing_articles: list[dict[str, Any]],
+) -> str | None:
+    """Verify every named entity in the headline traces to a single source article.
+
+    Returns a short reason string if the headline conflates entities from
+    unrelated articles, or None if it's grounded.
+
+    Targets the "narrative coupling" failure mode: each component (CVE,
+    victim, actor, product) is real and in the corpus, but the LLM glued
+    them into one sentence implying a causal link that doesn't exist.
+
+    On failure the caller should clear the headline so the frontend's regex
+    distillation of `what_happened` (which IS source-cited) takes over.
+    """
+    headline = (briefing.get("headline") or "").strip()
+    if not headline:
+        return None  # nothing to validate — frontend fallback will fire
+
+    src_idx = briefing.get("headline_source")
+    # The schema requires an integer; tolerate string-typed integers as a
+    # courtesy ("3" instead of 3) but reject anything else.
+    if isinstance(src_idx, str) and src_idx.strip().isdigit():
+        src_idx = int(src_idx.strip())
+    if not isinstance(src_idx, int) or src_idx < 1 or src_idx > len(briefing_articles):
+        return f"missing or invalid headline_source: {briefing.get('headline_source')!r}"
+
+    article = briefing_articles[src_idx - 1]
+    article_text = " ".join([
+        article.get("title") or "",
+        article.get("translated_title") or "",
+        article.get("summary") or "",
+    ])
+
+    from modules.entities import CVE_RE
+    headline_cves = {m.upper() for m in CVE_RE.findall(headline)}
+    article_cves = {m.upper() for m in CVE_RE.findall(article_text)}
+    missing_cves = headline_cves - article_cves
+    if missing_cves:
+        return (
+            f"headline cites CVEs {sorted(missing_cves)} "
+            f"not in source article #{src_idx}"
+        )
+
+    nouns = _extract_proper_nouns(headline)
+    article_lower = article_text.lower()
+    missing_nouns = {n for n in nouns if n.lower() not in article_lower}
+    if missing_nouns:
+        return (
+            f"headline names {sorted(missing_nouns)} "
+            f"not in source article #{src_idx}"
+        )
+
+    return None
 
 
 def _normalise_headline(raw: str | None) -> str:
@@ -555,6 +690,19 @@ def generate_briefing(articles: list[dict[str, Any]]) -> dict[str, Any] | None:
             existing = load_briefing()
             return existing if existing else None
 
+        # Guard against headline narrative-coupling (entities welded from
+        # unrelated source articles). On failure, clear the headline so the
+        # frontend's regex distillation of what_happened (which IS source-cited)
+        # takes over — we don't reject the whole briefing because what_happened
+        # has already passed the per-claim source check.
+        headline_issue = _validate_headline_grounding(briefing, briefing_articles)
+        if headline_issue:
+            logger.warning(
+                "Briefing headline cleared — %s. Frontend will distill from what_happened.",
+                headline_issue,
+            )
+            briefing["headline"] = ""
+
         # Build source article map so frontend can resolve [N] → link/title
         source_map = []
         for i, a in enumerate(briefing_articles[:_MAX_BRIEFING_ARTICLES], 1):
@@ -802,6 +950,15 @@ def generate_regional_briefings(articles: list[dict[str, Any]]) -> dict[str, Any
                     region_name, sorted(ungrounded),
                 )
                 continue
+
+            # Headline narrative-coupling guard (same logic as global digest).
+            headline_issue = _validate_headline_grounding(briefing, briefing_articles)
+            if headline_issue:
+                logger.warning(
+                    "Regional digest (%s) headline cleared — %s.",
+                    region_name, headline_issue,
+                )
+                briefing["headline"] = ""
 
             # Source article map
             source_map = []

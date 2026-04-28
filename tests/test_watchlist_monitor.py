@@ -172,19 +172,24 @@ class TestRunWatchlistMonitor:
 
 class TestFetchGnews:
     def test_parses_rss_items(self):
-        rss_xml = """<?xml version="1.0"?>
+        # Generate a pubDate within the last 24h relative to now(). The
+        # original test hardcoded 21 Apr 2026 — fine the day it was written,
+        # but silently filtered out as soon as now() drifted past +7 days.
+        from datetime import timedelta
+        recent = datetime.now(timezone.utc) - timedelta(days=1)
+        pub_date = recent.strftime("%a, %d %b %Y %H:%M:%S GMT")
+        rss_xml = f"""<?xml version="1.0"?>
         <rss><channel>
             <item>
                 <title>Test Article</title>
                 <link>https://example.com/article</link>
-                <pubDate>Mon, 21 Apr 2026 12:00:00 GMT</pubDate>
+                <pubDate>{pub_date}</pubDate>
                 <description>Test description</description>
             </item>
         </channel></rss>"""
         mock_resp = MagicMock()
         mock_resp.content = rss_xml.encode()
         mock_resp.raise_for_status = MagicMock()
-        from datetime import timedelta
         cutoff = datetime.now(timezone.utc) - timedelta(days=7)
         with patch("modules.watchlist_monitor.requests.get", return_value=mock_resp):
             from modules.watchlist_monitor import _fetch_gnews

@@ -171,13 +171,24 @@ class TestGenerateTopStories:
         llm_response = json.dumps({
             "top_stories": [{
                 "article_index": 1,
-                "headline": "Major breach",
-                "summary": "Big company hacked",
+                "headline": "Acme Corp confirms data breach",
+                "summary": "Acme Corp customers affected by intrusion.",
                 "significance": "CRITICAL",
                 "category": "Data Breach",
             }]
         })
-        articles = [_make_article(title=f"Article {i}", source_name="TestSource") for i in range(20)]
+        # The article at briefing_articles[0] (i.e. article_index=1 from the
+        # LLM) must contain the entities the LLM names ("Acme Corp"), otherwise
+        # the narrative-coupling guard will (correctly) drop it. Articles get
+        # sorted by timestamp DESC, so the Acme article needs the latest stamp.
+        future_ts = (datetime.now(timezone.utc) + timedelta(seconds=10)).isoformat()
+        articles = [_make_article(title=f"Article {i}", source_name="TestSource")
+                    for i in range(19)]
+        articles.append(_make_article(
+            title="Acme Corp confirms data breach exposing customers",
+            source_name="TestSource",
+            timestamp=future_ts,
+        ))
         last_call_path = tmp_path / ".top_stories_last_call"
         top_stories_path = tmp_path / "top_stories.json"
 
@@ -196,7 +207,7 @@ class TestGenerateTopStories:
         assert result is not None
         assert "stories" in result
         assert len(result["stories"]) == 1
-        assert result["stories"][0]["headline"] == "Major breach"
+        assert result["stories"][0]["headline"] == "Acme Corp confirms data breach"
         assert result["provider"] == "openai/test-model"
 
     def test_llm_failure_returns_none(self, tmp_path):
