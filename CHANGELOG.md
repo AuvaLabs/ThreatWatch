@@ -2,6 +2,25 @@
 
 All notable changes to ThreatWatch are documented here.
 
+## 2026-05-07 — Briefing success log reports the actual served tier (closes #3)
+
+Context: with three briefing tiers in play (Featherless → Claude Bridge → Groq+8B), the success log line `Intelligence briefing generated via openai/llama-3.1-8b-instant` always echoed the configured `BRIEFING_MODEL` regardless of which tier actually served. This was load-bearing telemetry that masked the KEV-signal-missing bug for weeks (caught only by reading prompt source, not logs — see 2026-05-06 entry). The data existed in `data/state/groq_usage.json` per-caller tags, but the in-process result of the dispatch never surfaced which tier won.
+
+### Fixed
+- **Tier-aware success log + `provider` field (`modules/briefing_generator.py`)**: `_call_openai_compatible` now sets a module-level `_LAST_SERVED_TIER` sentinel (`featherless/<model>` | `claude_bridge/<model>` | `groq/<model>`) as a side effect on each tier branch. `generate_briefing` and `generate_regional_briefings` read the sentinel and stamp it onto `briefing["provider"]` and the success log line. Anthropic branch retains its explicit `anthropic/<LLM_MODEL>` format. Defensive fallback to the legacy `openai/<BRIEFING_MODEL>` format if the sentinel is unset (should never happen on the openai-compatible path post-fix). Single-threaded pipeline assumption documented inline; if concurrent briefing generation is ever added, switch to a tuple return.
+
+### Architecture
+- **Why a module-level sentinel rather than a tuple return**: the alternative — changing `_call_openai_compatible` to return `(reply, served_tier)` — would have forced ~30 mock updates across `tests/test_briefing_generator.py`, `test_briefing_gen.py`, `test_briefing_featherless_routing.py`. The pipeline runs sequentially in a single process (briefings generated one after the other in `threatdigest_main.py`), so a module-level sentinel is safe today. Documented and revisitable.
+
+### Testing
+- New `TestServedTierLogging` class in `test_briefing_generator.py` (5 cases): provider stamped as `featherless/<model>` when Featherless serves, `claude_bridge/<model>` when Featherless fails and Bridge serves, `groq/<BRIEFING_MODEL>` when both premium tiers fail, `groq/<BRIEFING_MODEL>` when no premium tier is configured, success log line contains `via featherless/...` (not the legacy `via openai/...` format).
+- `test_briefing_gen.py::test_successful_generation` updated to patch `_LAST_SERVED_TIER=None` so sibling test files (e.g. `test_briefing_featherless_routing.py` which calls the real dispatch) don't bleed state.
+- 53/53 pass on `test_briefing_generator.py`; 134/135 pass across all three briefing test modules. The single remaining failure (`test_generated_at_stamped_after_llm_call`) is pre-existing on HEAD, unrelated to this change.
+
+### Operations
+- Hot-deploy: `docker cp modules/briefing_generator.py threatwatch-pipeline:/app/modules/briefing_generator.py && docker restart threatwatch-pipeline`. Code-path-only change, no env change required.
+- Verification (next ~30-min AI cycle): pipeline log line will read `Intelligence briefing generated via featherless/deepseek-ai/DeepSeek-V3.2.` (or whichever tier won) — accurate per-cycle. Cross-check with `data/state/groq_usage.json` `featherless:briefing` / `claude_bridge:briefing` / `groq:briefing` counters.
+
 ## 2026-05-06 — Briefing share-payload enrichment + KEV-listed extended tenure (72h default)
 
 Context: shipped two quality-of-life upgrades to the briefing surface plus a side-fix for a latent KEV signal bug discovered during planning.

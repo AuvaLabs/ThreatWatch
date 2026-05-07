@@ -471,6 +471,132 @@ class TestGenerateBriefing:
 
 
 # ---------------------------------------------------------------------------
+# Issue #3 — `provider` field + success log report the actual served tier
+# (Featherless / Claude Bridge / Groq) instead of always echoing BRIEFING_MODEL.
+# These tests exercise the real `_call_openai_compatible` code path and only
+# mock the innermost tier callables, so the `_LAST_SERVED_TIER` sentinel
+# actually gets set and read end-to-end.
+# ---------------------------------------------------------------------------
+class TestServedTierLogging:
+    def setup_method(self):
+        import modules.briefing_generator as _bg
+        _bg._LAST_SERVED_TIER = None
+
+    def teardown_method(self):
+        import modules.briefing_generator as _bg
+        _bg._LAST_SERVED_TIER = None
+
+    @patch("modules.briefing_generator._record_api_call")
+    @patch("modules.briefing_generator._is_rate_limited", return_value=False)
+    @patch("modules.briefing_generator._save_briefing")
+    @patch("modules.briefing_generator.cache_result")
+    @patch("modules.briefing_generator.get_cached_result", return_value=None)
+    @patch("modules.briefing_generator._featherless_available", return_value=True)
+    @patch("modules.briefing_generator._call_featherless")
+    @patch("modules.briefing_generator._detect_provider", return_value="openai")
+    def test_provider_reflects_featherless_when_featherless_serves(
+        self, _, mock_feather, _ff_avail, _cache_get, _cache_set, _save, _rl, _rec,
+    ):
+        from modules.briefing_generator import FEATHERLESS_MODEL
+        mock_feather.return_value = json.dumps(_valid_briefing())
+        result = generate_briefing([_article() for _ in range(5)])
+        assert result is not None
+        assert result["provider"] == f"featherless/{FEATHERLESS_MODEL}"
+        mock_feather.assert_called_once()
+
+    @patch("modules.briefing_generator._record_api_call")
+    @patch("modules.briefing_generator._is_rate_limited", return_value=False)
+    @patch("modules.briefing_generator._save_briefing")
+    @patch("modules.briefing_generator.cache_result")
+    @patch("modules.briefing_generator.get_cached_result", return_value=None)
+    @patch("modules.briefing_generator._call_claude_bridge")
+    @patch("modules.briefing_generator._claude_bridge_available", return_value=True)
+    @patch("modules.briefing_generator._call_featherless", side_effect=Exception("featherless 429"))
+    @patch("modules.briefing_generator._featherless_available", return_value=True)
+    @patch("modules.briefing_generator._detect_provider", return_value="openai")
+    def test_provider_reflects_claude_bridge_when_featherless_fails(
+        self, _, _ff_avail, _ff_call, _cb_avail, mock_bridge,
+        _cache_get, _cache_set, _save, _rl, _rec,
+    ):
+        from modules.briefing_generator import CLAUDE_BRIDGE_MODEL
+        mock_bridge.return_value = json.dumps(_valid_briefing())
+        result = generate_briefing([_article() for _ in range(5)])
+        assert result is not None
+        assert result["provider"] == f"claude_bridge/{CLAUDE_BRIDGE_MODEL}"
+        mock_bridge.assert_called_once()
+
+    @patch("modules.briefing_generator._record_api_call")
+    @patch("modules.briefing_generator._is_rate_limited", return_value=False)
+    @patch("modules.briefing_generator._save_briefing")
+    @patch("modules.briefing_generator.cache_result")
+    @patch("modules.briefing_generator.get_cached_result", return_value=None)
+    @patch("modules.briefing_generator._call_groq")
+    @patch("modules.briefing_generator._call_claude_bridge", side_effect=Exception("bridge down"))
+    @patch("modules.briefing_generator._claude_bridge_available", return_value=True)
+    @patch("modules.briefing_generator._call_featherless", side_effect=Exception("featherless 429"))
+    @patch("modules.briefing_generator._featherless_available", return_value=True)
+    @patch("modules.briefing_generator._detect_provider", return_value="openai")
+    def test_provider_reflects_groq_when_premium_tiers_fail(
+        self, _, _ff_avail, _ff_call, _cb_avail, _cb_call, mock_groq,
+        _cache_get, _cache_set, _save, _rl, _rec,
+    ):
+        from modules.briefing_generator import BRIEFING_MODEL
+        mock_groq.return_value = json.dumps(_valid_briefing())
+        result = generate_briefing([_article() for _ in range(5)])
+        assert result is not None
+        # Global briefing passes BRIEFING_MODEL into _call_openai_compatible
+        # as the model kwarg, so the Groq tier reports that model.
+        assert result["provider"] == f"groq/{BRIEFING_MODEL}"
+        mock_groq.assert_called_once()
+
+    @patch("modules.briefing_generator._record_api_call")
+    @patch("modules.briefing_generator._is_rate_limited", return_value=False)
+    @patch("modules.briefing_generator._save_briefing")
+    @patch("modules.briefing_generator.cache_result")
+    @patch("modules.briefing_generator.get_cached_result", return_value=None)
+    @patch("modules.briefing_generator._call_groq")
+    @patch("modules.briefing_generator._claude_bridge_available", return_value=False)
+    @patch("modules.briefing_generator._featherless_available", return_value=False)
+    @patch("modules.briefing_generator._detect_provider", return_value="openai")
+    def test_provider_reflects_groq_when_no_premium_tier_configured(
+        self, _, _ff_avail, _cb_avail, mock_groq,
+        _cache_get, _cache_set, _save, _rl, _rec,
+    ):
+        from modules.briefing_generator import BRIEFING_MODEL
+        mock_groq.return_value = json.dumps(_valid_briefing())
+        result = generate_briefing([_article() for _ in range(5)])
+        assert result is not None
+        assert result["provider"] == f"groq/{BRIEFING_MODEL}"
+        mock_groq.assert_called_once()
+
+    @patch("modules.briefing_generator._record_api_call")
+    @patch("modules.briefing_generator._is_rate_limited", return_value=False)
+    @patch("modules.briefing_generator._save_briefing")
+    @patch("modules.briefing_generator.cache_result")
+    @patch("modules.briefing_generator.get_cached_result", return_value=None)
+    @patch("modules.briefing_generator._featherless_available", return_value=True)
+    @patch("modules.briefing_generator._call_featherless")
+    @patch("modules.briefing_generator._detect_provider", return_value="openai")
+    def test_success_log_line_includes_actual_served_tier(
+        self, _, mock_feather, _ff_avail, _cache_get, _cache_set, _save, _rl, _rec, caplog,
+    ):
+        """Issue #3 fix: success log must say "via featherless/..." not the
+        old misleading "via openai/llama-3.1-8b-instant" regardless of tier.
+        """
+        import logging
+        from modules.briefing_generator import FEATHERLESS_MODEL
+        mock_feather.return_value = json.dumps(_valid_briefing())
+        with caplog.at_level(logging.INFO, logger="modules.briefing_generator"):
+            generate_briefing([_article() for _ in range(5)])
+        success_lines = [r.message for r in caplog.records
+                         if "Intelligence briefing generated via" in r.message]
+        assert success_lines, "expected one 'Intelligence briefing generated via' log line"
+        assert f"via featherless/{FEATHERLESS_MODEL}" in success_lines[-1]
+        # Belt-and-braces: the misleading legacy format must NOT appear.
+        assert "via openai/" not in success_lines[-1]
+
+
+# ---------------------------------------------------------------------------
 # load_briefing
 # ---------------------------------------------------------------------------
 class TestLoadBriefing:

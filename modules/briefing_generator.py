@@ -480,6 +480,18 @@ def _compute_reporting_window(articles: list[dict[str, Any]]) -> str:
 
 
 
+# Module-level sentinel for tier-aware logging. Set as a side effect of
+# `_call_openai_compatible` so callers can stamp the actual served tier on
+# the briefing's `provider` field and the success log instead of always
+# echoing the configured `BRIEFING_MODEL` (issue #3).
+#
+# Single-threaded pipeline assumption — `generate_briefing` and
+# `generate_regional_briefings` run sequentially in a single Python process
+# (see threatdigest_main.py). If concurrent briefing generation is ever
+# added, switch this to a tuple return on `_call_openai_compatible`.
+_LAST_SERVED_TIER: str | None = None
+
+
 def _call_openai_compatible(user_content: str, system_prompt: str = None,
                             max_tokens: int = 2000,
                             caller: str | None = None,
@@ -511,11 +523,18 @@ def _call_openai_compatible(user_content: str, system_prompt: str = None,
     a richer narrative than Groq's 6K TPM allows. If None, Featherless uses
     the same ``max_tokens`` as the Groq fallback — preserves prior behavior
     for callers that don't opt in.
+
+    Side effect: writes the served tier identifier to
+    ``_LAST_SERVED_TIER`` (one of ``'featherless/<model>'``,
+    ``'claude_bridge/<model>'``, ``'groq/<model>'``) so the caller can log
+    and stamp the actual tier that served instead of guessing from the
+    configured ``BRIEFING_MODEL`` env. Single-threaded only.
     """
+    global _LAST_SERVED_TIER
     sys_prompt = system_prompt or _BRIEFING_PROMPT
     if prefer_featherless and _featherless_available():
         try:
-            return _call_featherless(
+            reply = _call_featherless(
                 user_content,
                 system_prompt=sys_prompt,
                 max_tokens=feather_max_tokens or max_tokens,
@@ -523,6 +542,8 @@ def _call_openai_compatible(user_content: str, system_prompt: str = None,
                 caller=caller,
                 model=FEATHERLESS_MODEL,
             )
+            _LAST_SERVED_TIER = f"featherless/{FEATHERLESS_MODEL}"
+            return reply
         except Exception as e:
             logger.warning(
                 "Featherless briefing call failed (%s); trying Claude Bridge.", e,
@@ -535,7 +556,7 @@ def _call_openai_compatible(user_content: str, system_prompt: str = None,
     # the same risk we already handle in _parse_json downstream.
     if prefer_featherless and _claude_bridge_available():
         try:
-            return _call_claude_bridge(
+            reply = _call_claude_bridge(
                 user_content,
                 system_prompt=sys_prompt,
                 max_tokens=feather_max_tokens or max_tokens,
@@ -543,12 +564,14 @@ def _call_openai_compatible(user_content: str, system_prompt: str = None,
                 caller=caller,
                 model=CLAUDE_BRIDGE_MODEL,
             )
+            _LAST_SERVED_TIER = f"claude_bridge/{CLAUDE_BRIDGE_MODEL}"
+            return reply
         except Exception as e:
             logger.warning(
                 "Claude Bridge briefing call failed (%s); falling back to Groq+%s.",
                 e, model or LLM_MODEL,
             )
-    return _call_groq(
+    reply = _call_groq(
         user_content,
         system_prompt=sys_prompt,
         max_tokens=max_tokens,
@@ -556,6 +579,8 @@ def _call_openai_compatible(user_content: str, system_prompt: str = None,
         caller=caller,
         model=model,
     )
+    _LAST_SERVED_TIER = f"groq/{model or LLM_MODEL}"
+    return reply
 
 
 def _call_anthropic(user_content: str) -> str:
@@ -833,13 +858,21 @@ def generate_briefing(articles: list[dict[str, Any]]) -> dict[str, Any] | None:
         briefing["articles_analyzed"] = min(len(briefing_articles), _MAX_BRIEFING_ARTICLES)
         briefing["total_articles"] = len(articles)  # total including darkweb
         briefing["reporting_window"] = reporting_window
-        briefing_model_name = LLM_MODEL if provider == "anthropic" else BRIEFING_MODEL
-        briefing["provider"] = f"{provider}/{briefing_model_name}"
+        # Resolve the actual served tier (issue #3 fix). Anthropic branch is
+        # explicit; openai-compatible branch reads the sentinel set by
+        # `_call_openai_compatible`. Falls back to the configured BRIEFING_MODEL
+        # only if the sentinel is unset (defensive — should never happen in
+        # the openai-compatible path post-fix).
+        if provider == "anthropic":
+            served_tier = f"anthropic/{LLM_MODEL}"
+        else:
+            served_tier = _LAST_SERVED_TIER or f"openai/{BRIEFING_MODEL}"
+        briefing["provider"] = served_tier
 
         _record_api_call()
         cache_result(cache_key, briefing)
         _save_briefing(briefing)
-        logger.info(f"Intelligence briefing generated via {provider}/{briefing_model_name}.")
+        logger.info(f"Intelligence briefing generated via {served_tier}.")
         return briefing
 
     except Exception as e:
@@ -1087,7 +1120,16 @@ def generate_regional_briefings(articles: list[dict[str, Any]]) -> dict[str, Any
             briefing["articles_analyzed"] = len(briefing_articles)
             briefing["total_articles"] = len(regional_articles)
             briefing["reporting_window"] = "Last 24 hours"
-            briefing["provider"] = f"{provider}/{LLM_MODEL}"
+            # Stamp the actual served tier (issue #3). Regional briefings do
+            # NOT pass `prefer_featherless`, so they always go to Groq —
+            # `_LAST_SERVED_TIER` will reflect that, but the conditional
+            # keeps the anthropic branch correct and is defensive against
+            # future changes to the regional dispatch path.
+            if provider == "anthropic":
+                regional_tier = f"anthropic/{LLM_MODEL}"
+            else:
+                regional_tier = _LAST_SERVED_TIER or f"openai/{LLM_MODEL}"
+            briefing["provider"] = regional_tier
 
             # Record rate limit and cache
             try:
@@ -1100,7 +1142,7 @@ def generate_regional_briefings(articles: list[dict[str, Any]]) -> dict[str, Any
             results[region_key] = briefing
             logger.info(
                 f"Regional digest ({region_name}): generated from "
-                f"{len(briefing_articles)} articles."
+                f"{len(briefing_articles)} articles via {regional_tier}."
             )
 
         except Exception as e:
